@@ -1,0 +1,16 @@
+# Mask-conditioned LDM at 256 px (32x32 latent): the main high-resolution setting.
+_base_: base.yaml
+name: ldm256_maskcond
+data:
+  image_size: 256
+  processed_dir: data/processed/brats256
+model:
+  conditioning: mask
+  cond_dropout: 0.1
+train:
+  output_dir: runs/ldm256_maskcond
+  batch_size: 32
+  epochs: 200
+sample:
+  batch_size: 32
+  guidance_scale: 2.0

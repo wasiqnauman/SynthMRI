@@ -1,0 +1,13 @@
+# Mask-conditioned LDM at 128 px (16x16 latent): produces paired (image, mask) data.
+_base_: base.yaml
+name: ldm128_maskcond
+data:
+  image_size: 128
+  processed_dir: data/processed/brats128
+model:
+  conditioning: mask
+  cond_dropout: 0.1
+train:
+  output_dir: runs/ldm128_maskcond
+sample:
+  guidance_scale: 2.0

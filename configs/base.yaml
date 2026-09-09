@@ -1,0 +1,70 @@
+# Shared defaults. Experiment configs inherit from this file via `_base_` and override keys.
+name: base
+
+data:
+  raw_dir: data/raw/BraTS2020/BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData
+  processed_dir: data/processed/brats128
+  splits_file: splits/brats2020_patient_splits.json
+  image_size: 128
+  crop_size: 224            # centre crop before resizing; brain extent in BraTS 2020 is within [29, 223] px
+  modalities: [flair, t1ce, t2]
+  tumour_frac_min: 0.001    # keep axial slices whose tumour covers >= 0.1 % of the slice
+  val_frac: 0.1             # patient-level fractions
+  test_frac: 0.2
+  split_seed: 0
+  clip_percentiles: [0.5, 99.5]
+  num_workers: 16
+
+model:
+  vae:
+    pretrained: stabilityai/sd-vae-ft-mse
+    scaling_factor: null    # null -> use the VAE's own (0.18215)
+  unet:
+    block_out_channels: [128, 256, 512, 512]
+    layers_per_block: 2
+    attention_levels: [1, 2]
+    attention_head_dim: 8
+    dropout: 0.0
+    norm_num_groups: 32
+  conditioning: none        # none | mask
+  num_mask_classes: 4
+  cond_dropout: 0.1
+
+diffusion:
+  num_train_timesteps: 1000
+  beta_schedule: linear
+  prediction_type: epsilon
+
+train:
+  output_dir: runs/base
+  seed: 0
+  epochs: 200
+  batch_size: 64
+  lr: 1.0e-4
+  weight_decay: 0.01
+  lr_scheduler: cosine
+  warmup_steps: 500
+  grad_clip: 1.0
+  ema_decay: 0.9999
+  ema_warmup: true
+  mixed_precision: bf16
+  use_cached_latents: true
+  hflip: true
+  val_every: 1
+  sample_every: 10
+  save_every: 10
+  num_sample_images: 16
+  sample_steps: 50
+  log_every: 50
+  num_workers: 8
+
+sample:
+  num_images: 2000
+  batch_size: 64
+  sampler: ddim
+  steps: 50
+  guidance_scale: 1.0
+  eta: 0.0
+  seed: 0
+  use_ema: true
+  mask_source: train

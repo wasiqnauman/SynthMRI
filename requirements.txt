@@ -1,0 +1,32 @@
+# Minimum versions. The exact versions used for the reported experiments are in
+# requirements-lock.txt (generated with `pip freeze`).
+#
+# Install PyTorch first for your CUDA version, e.g.
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+torch>=2.4
+torchvision>=0.19
+diffusers>=0.32
+accelerate>=1.0
+nibabel>=5.0
+opencv-python-headless>=4.8
+numpy>=1.26
+scipy>=1.11
+scikit-image>=0.22
+scikit-learn>=1.3
+pandas>=2.0
+matplotlib>=3.8
+tqdm>=4.66
+pyyaml>=6.0
+torchmetrics>=1.4
+torch-fidelity>=0.3.0
+lpips>=0.1.4
+monai>=1.3
+tensorboard>=2.15
+# dev
+pytest>=8.0
+pytest-cov>=5.0
+ruff>=0.5
+nbformat
+nbconvert
+jupyter
+ipykernel

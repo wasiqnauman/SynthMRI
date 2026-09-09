@@ -1,0 +1,26 @@
+# Tiny end-to-end run (a few steps, small U-Net) to check the pipeline on real data.
+_base_: base.yaml
+name: smoke
+data:
+  image_size: 128
+  processed_dir: data/processed/brats128
+model:
+  unet:
+    block_out_channels: [64, 128, 128, 128]
+  conditioning: mask
+train:
+  output_dir: runs/smoke
+  epochs: 1
+  max_steps: 30
+  batch_size: 8
+  warmup_steps: 5
+  log_every: 5
+  sample_every: 1
+  save_every: 1
+  num_sample_images: 4
+  sample_steps: 10
+  num_workers: 2
+sample:
+  num_images: 16
+  batch_size: 8
+  steps: 10

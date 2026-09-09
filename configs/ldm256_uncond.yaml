@@ -1,0 +1,14 @@
+# Unconditional LDM at 256 px (32x32 latent).
+_base_: base.yaml
+name: ldm256_uncond
+data:
+  image_size: 256
+  processed_dir: data/processed/brats256
+model:
+  conditioning: none
+train:
+  output_dir: runs/ldm256_uncond
+  batch_size: 32
+  epochs: 200
+sample:
+  batch_size: 32
