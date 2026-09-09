@@ -69,7 +69,8 @@ def segmentation_tables(runs_dir: Path) -> tuple[list[str], dict]:
     for p in sorted(runs_dir.glob("seg/*/results.json")):
         r = json.loads(p.read_text())
         a = r["args"]
-        key = (float(a.get("real_fraction", 1.0)), bool(a.get("synthetic")), bool(a.get("synthetic_only")), int(r.get("n_synthetic", 0)))
+        # Patient-matched filtering makes the synthetic count seed-dependent, so it is reported, not grouped on.
+        key = (float(a.get("real_fraction", 1.0)), bool(a.get("synthetic")), bool(a.get("synthetic_only")))
         groups[key].append(r)
     if not groups:
         return [], {}
@@ -77,22 +78,33 @@ def segmentation_tables(runs_dir: Path) -> tuple[list[str], dict]:
              "| training data | real patients | real slices | synthetic slices | seeds | WT | TC | ET | mean |", "|---|---|---|---|---|---|---|---|---|"]
     summary = {}
     for key in sorted(groups, key=lambda k: (k[2], k[0], k[1])):
-        frac, synth, only, n_synth = key
+        frac, synth, only = key
         rs = groups[key]
         name = "synthetic only" if only else (f"{frac:.0%} real" + (" + synthetic" if synth else ""))
         vals = {r_: [r["test"]["patient"][r_]["mean"] for r in rs] for r_ in ("WT", "TC", "ET")}
         vals["mean"] = [r["test"]["mean_WT_TC_ET"] for r in rs]
         cells = " | ".join(fmt(float(np.mean(v)), float(np.std(v))) for v in vals.values())
-        lines.append(f"| {name} | {rs[0]['n_real_patients']} | {rs[0]['n_real_slices']} | {n_synth} | {len(rs)} | {cells} |")
-        summary[name] = {k: {"mean": float(np.mean(v)), "std": float(np.std(v)), "values": v} for k, v in vals.items()} | {"n_seeds": len(rs)}
+        n_synth = [int(r.get("n_synthetic", 0)) for r in rs]
+        n_synth_cell = str(n_synth[0]) if min(n_synth) == max(n_synth) else f"{min(n_synth)}–{max(n_synth)}"
+        n_real = [int(r["n_real_slices"]) for r in rs]
+        n_real_cell = str(n_real[0]) if min(n_real) == max(n_real) else f"{min(n_real)}–{max(n_real)}"
+        lines.append(f"| {name} | {rs[0]['n_real_patients']} | {n_real_cell} | {n_synth_cell} | {len(rs)} | {cells} |")
+        summary[name] = {k: {"mean": float(np.mean(v)), "std": float(np.std(v)), "values": v} for k, v in vals.items()} | {
+            "n_seeds": len(rs), "n_real_patients": int(rs[0]["n_real_patients"]), "n_real_slices": n_real, "n_synthetic": n_synth}
     lines.append("")
-    cons = [(r["args"]["out"], r["synthetic_consistency"]) for rs in groups.values() for r in rs if "synthetic_consistency" in r]
+    cons = {k: [r["synthetic_consistency"] for r in rs if "synthetic_consistency" in r] for k, rs in groups.items()}
+    cons = {k: v for k, v in cons.items() if v}
     if cons:
-        lines += ["## Mask consistency of synthetic samples (real-trained segmenter, per-slice Dice vs conditioning mask)", "",
-                  "| segmenter run | n | WT | TC | ET |", "|---|---|---|---|---|"]
-        for out, c in cons:
-            s = c["slice"]
-            lines.append(f"| {Path(out).name} | {c['n']} | {s['WT']['mean']:.3f} | {s['TC']['mean']:.3f} | {s['ET']['mean']:.3f} |")
+        lines += ["## Mask consistency of synthetic samples (per-slice Dice of a real-trained segmenter vs the conditioning mask, mean ± std over seeds)", "",
+                  "| segmenter | n synthetic | WT | TC | ET |", "|---|---|---|---|---|"]
+        summary["mask_consistency"] = {}
+        for key in sorted(cons, key=lambda k: (k[2], k[0], k[1])):
+            frac, synth, only = key
+            name = "synthetic only" if only else (f"{frac:.0%} real" + (" + synthetic" if synth else ""))
+            vals = {r_: [c["slice"][r_]["mean"] for c in cons[key]] for r_ in ("WT", "TC", "ET")}
+            cells = " | ".join(fmt(float(np.mean(v)), float(np.std(v))) for v in vals.values())
+            lines.append(f"| {name} | {cons[key][0]['n']} | {cells} |")
+            summary["mask_consistency"][name] = {k: {"mean": float(np.mean(v)), "std": float(np.std(v)), "values": v} for k, v in vals.items()} | {"n_seeds": len(cons[key])}
         lines.append("")
     return lines, summary
 

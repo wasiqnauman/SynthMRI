@@ -20,8 +20,10 @@ wd 0.01, 500 warm-up steps then cosine; grad-clip 1.0; EMA 0.9999 with warm-up; 
 
 ## Generation quality (`scripts/sample.py` + `scripts/evaluate.py`)
 
-5,000 samples per model with DDIM, 50 steps, η = 0 (mask-conditioned: guidance scale 2.0 and 1.0,
-masks drawn from the training split with random flips). Against all 4,623 real test slices:
+5,000 samples per model and setting with DDIM, 50 steps, η = 0 (mask-conditioned: guidance scale
+2.0 and 1.0, masks drawn uniformly from the training split with random horizontal flips). The
+LDM-128-mask / guidance-2.0 set is generated with 20,000 samples; its first 5,000 are scored here and
+the whole set is the pool for the segmentation study below. Against all 4,623 real test slices:
 
 * **FID / KID** per modality (grey → RGB) and for the composite RGB image, InceptionV3 features
   (torch-fidelity). Reference floor: FID/KID between real *val* and real *test* slices.
@@ -36,16 +38,24 @@ masks drawn from the training split with random flips). Against all 4,623 real t
 one-cycle schedule, 40 epochs, batch 32, horizontal flips; model selection on real validation
 patients; evaluation on real test patients with per-patient Dice for WT / TC / ET.
 
-| condition | real training patients | synthetic slices | seeds |
-|---|---|---|---|
-| real 10 % | 26 | 0 / 5,000 | 0, 1, 2 |
-| real 25 % | 65 | 0 / 5,000 | 0, 1, 2 |
-| real 100 % | 258 | 0 / 5,000 | 0, 1, 2 |
-| synthetic only | 0 | 5,000 | 0, 1, 2 |
+| condition | real training patients | real slices | synthetic slices | seeds |
+|---|---|---|---|---|
+| real 10 % | 26 | ≈ 1,600 | 0 / ≈ 2,000 | 0, 1, 2 |
+| real 25 % | 65 | ≈ 4,000 | 0 / ≈ 5,000 | 0, 1, 2 |
+| real 100 % | 258 | 15,895 | 0 / 20,000 | 0, 1, 2 |
+| synthetic only | 0 | 0 | 20,000 | 0, 1, 2 |
 
-Synthetic pairs come from LDM-128-mask (guidance 2.0). The real-only segmenters are additionally
-scored on the synthetic pairs ("mask consistency": how well the generated image matches the mask it
-was conditioned on).
+The synthetic pool is the 20,000-sample LDM-128-mask set (guidance 2.0), each sample paired with the
+training mask it was conditioned on. The patient subset for a fraction is drawn with the run's seed
+(`subsample_patients`). **Patient matching:** a real-x % segmenter only receives synthetic slices
+whose conditioning mask belongs to one of its own x % patients, so the low-data conditions never see
+tumour shapes from patients they do not have (otherwise the masks alone would leak information from
+the held-out 90 %). The synthetic count therefore scales with the fraction and varies slightly
+across seeds; `collect_results.py` reports the range. The synthetic-only condition uses the full pool.
+
+The real-only segmenters are additionally scored on all 20,000 synthetic pairs ("mask
+consistency": per-slice Dice between the segmenter's prediction on the generated image and the mask
+the image was conditioned on).
 
 ## What would strengthen the paper further
 

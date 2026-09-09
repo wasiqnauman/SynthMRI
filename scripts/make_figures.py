@@ -120,8 +120,7 @@ def segmentation_figure(summary_json: Path, out: Path) -> None:
                     ax.text(b.get_x() + b.get_width() / 2, 0.02, f"{m_:.3f}", ha="center", va="bottom", fontsize=6, color="white", rotation=90)
         if "synthetic only" in seg:
             v = seg["synthetic only"].get(r, {}).get("mean", np.nan)
-            ax.axhline(v, color=SERIES[2], linewidth=1.2, linestyle=(0, (4, 3)))
-            ax.text(len(fracs) - 0.5, v, " synthetic only", color=SERIES[2], fontsize=7, va="bottom", ha="right")
+            ax.axhline(v, color=SERIES[2], linewidth=1.2, linestyle=(0, (4, 3)), label="synthetic only")
         ax.set_xticks(x)
         ax.set_xticklabels([f.replace(" real", "") for f in fracs])
         ax.set_title(f"{r} Dice", color=INK, fontsize=9, loc="left")
@@ -129,9 +128,10 @@ def segmentation_figure(summary_json: Path, out: Path) -> None:
         _style(ax)
     axes[0].set_ylabel("per-patient Dice (test)", color=INK2, fontsize=8)
     axes[0].set_xlabel("real training patients", color=INK2, fontsize=8)
-    axes[-1].legend(frameon=False, fontsize=7, loc="upper left")
-    fig.tight_layout()
-    fig.savefig(out / "segmentation_dice.png")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, frameon=False, fontsize=7, loc="lower center", ncol=len(labels), bbox_to_anchor=(0.5, -0.02))
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
+    fig.savefig(out / "segmentation_dice.png", bbox_inches="tight")
     plt.close(fig)
 
 

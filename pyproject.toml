@@ -47,6 +47,7 @@ markers = [
 filterwarnings = ["ignore::DeprecationWarning", "ignore::UserWarning", "ignore::FutureWarning"]
 
 [tool.ruff]
+extend-exclude = ["notebooks"]   # legacy Colab notebook is kept verbatim
 line-length = 110
 target-version = "py310"
 
