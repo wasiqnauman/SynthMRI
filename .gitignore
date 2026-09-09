@@ -1,0 +1,26 @@
+# Local notebooks and caches
+.ipynb_checkpoints/
+
+# Large local datasets
+BraTS2020_TrainingData/**
+BraTS2020_ValidationData/**
+
+# Generated tensors, checkpoints, model weights, and synthetic outputs
+processed_data/**
+diffusion_model_brats/**
+diffusion_model_brats_finetuned/**
+synthetic_data/**
+
+# Preserve the directory layout required by the notebook
+!BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData/
+!BraTS2020_TrainingData/MICCAI_BraTS2020_TrainingData/.gitkeep
+!BraTS2020_ValidationData/MICCAI_BraTS2020_ValidationData/
+!BraTS2020_ValidationData/MICCAI_BraTS2020_ValidationData/.gitkeep
+!processed_data/images/
+!processed_data/images/.gitkeep
+!processed_data/masks/
+!processed_data/masks/.gitkeep
+!diffusion_model_brats/.gitkeep
+!diffusion_model_brats_finetuned/.gitkeep
+!synthetic_data/images/
+!synthetic_data/images/.gitkeep
