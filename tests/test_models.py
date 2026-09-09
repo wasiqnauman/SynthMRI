@@ -71,3 +71,24 @@ def test_schedulers(tiny_cfg):
     assert len(ddim.timesteps) == 5
     with pytest.raises(ValueError):
         build_sampling_scheduler(tiny_cfg.diffusion, "euler")
+
+
+def test_vae_wrapper_keeps_cudnn_benchmark_setting():
+    from synthmri.models.vae import cudnn_heuristics
+
+    prev = torch.backends.cudnn.benchmark
+    try:
+        torch.backends.cudnn.benchmark = True
+        with cudnn_heuristics():
+            assert torch.backends.cudnn.benchmark is False
+        assert torch.backends.cudnn.benchmark is True
+        vae = VAEWrapper(DummyVAE(), scaling_factor=0.5)
+        x = torch.rand(2, 3, 32, 32) * 2 - 1
+        vae.reconstruct(x)
+        assert torch.backends.cudnn.benchmark is True
+        with pytest.raises(RuntimeError):
+            with cudnn_heuristics():
+                raise RuntimeError("boom")
+        assert torch.backends.cudnn.benchmark is True  # restored even on error
+    finally:
+        torch.backends.cudnn.benchmark = prev

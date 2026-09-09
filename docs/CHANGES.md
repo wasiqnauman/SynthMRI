@@ -1,5 +1,19 @@
 # Work log
 
+## 2026-09-09 -- Stop cuDNN autotuning inside the VAE (18–36 GB transient spikes)
+
+With `cudnn.benchmark = True` (set by `seed_everything` for non-deterministic runs) the first VAE
+decode at a new shape tried FFT-style convolution algorithms whose workspaces peaked at 18 GB for
+16 images at 128 px and 36 GB at 256 px, while the heuristic algorithm runs at the same speed
+(0.15 vs 0.19 s per 16-image decode). `VAEWrapper.encode/encode_dist/decode` now run under a
+`cudnn_heuristics()` guard that turns autotuning off for the VAE only and restores the flag
+afterwards. Training and sampling memory now match the numbers in `docs/REPRODUCE.md`. The
+`ldm128_maskcond` run had already started on the previous commit; the change affects only which
+convolution kernel cuDNN picks for the VAE, not the model or the data.
+
+Files: synthmri/models/vae.py, tests/test_models.py, docs/REPRODUCE.md
+Follow-ups: none
+
 ## 2026-09-09 -- Launch the full experiment set; fix seed aggregation of segmentation runs
 
 Started `scripts/run_experiments.sh` (stages train → sample → eval → seg → collect; log in

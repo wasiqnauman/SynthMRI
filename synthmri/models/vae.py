@@ -7,6 +7,7 @@ that they have roughly unit variance, as in Rombach et al. (2022).
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 import torch
@@ -15,6 +16,23 @@ from torch import nn
 
 LATENT_CHANNELS = 4
 DOWNSAMPLE = 8
+
+
+@contextmanager
+def cudnn_heuristics():
+    """Run with ``cudnn.benchmark`` off.
+
+    Autotuning the VAE's full-resolution convolutions tries FFT-style algorithms whose workspaces
+    peak at ~18 GB (128 px) / ~36 GB (256 px) for a 16-image decode, while the heuristic choice is
+    within a few percent of the same speed. The VAE only ever sees a handful of shapes, so the
+    U-Net keeps autotuning and the VAE does not.
+    """
+    prev = torch.backends.cudnn.benchmark
+    torch.backends.cudnn.benchmark = False
+    try:
+        yield
+    finally:
+        torch.backends.cudnn.benchmark = prev
 
 
 class VAEWrapper(nn.Module):
@@ -28,20 +46,23 @@ class VAEWrapper(nn.Module):
     @torch.no_grad()
     def encode_dist(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Unscaled posterior (mean, logvar) for images ``x`` in [-1, 1]."""
-        dist = self.vae.encode(x).latent_dist
+        with cudnn_heuristics():
+            dist = self.vae.encode(x).latent_dist
         return dist.mean, dist.logvar
 
     @torch.no_grad()
     def encode(self, x: torch.Tensor, sample: bool = True) -> torch.Tensor:
         """Scaled latent; ``sample=False`` returns the posterior mean."""
-        dist = self.vae.encode(x).latent_dist
+        with cudnn_heuristics():
+            dist = self.vae.encode(x).latent_dist
         z = dist.sample() if sample else dist.mode()
         return z * self.scaling_factor
 
     @torch.no_grad()
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         """Scaled latent -> image in [-1, 1] (not clamped)."""
-        return self.vae.decode(z / self.scaling_factor).sample
+        with cudnn_heuristics():
+            return self.vae.decode(z / self.scaling_factor).sample
 
     @torch.no_grad()
     def reconstruct(self, x: torch.Tensor, sample: bool = False) -> torch.Tensor:

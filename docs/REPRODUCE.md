@@ -1,8 +1,9 @@
 # Reproducing the experiments
 
 Everything below was run on one NVIDIA RTX A6000 (48 GB) with the package versions in
-`requirements-lock.txt`. A GPU with ≥ 16 GB is enough for every configuration (the 128-px models use
-about 4.5 GB at batch 64; the 256-px model about 12 GB at batch 32). Times are wall-clock on that card.
+`requirements-lock.txt`. A GPU with 16 GB is enough for every configuration: training peaks at about
+4.5 GB (128 px, batch 64) and 8 GB (256 px, batch 32); sampling at about 2 GB (128 px, batch 64) and
+8 GB (256 px, batch 32). Times are wall-clock on that card.
 
 ## 1. Environment
 
