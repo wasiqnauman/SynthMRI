@@ -24,3 +24,4 @@ sample:
   num_images: 16
   batch_size: 8
   steps: 10
+  guidance_scale: 2.0

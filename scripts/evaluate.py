@@ -75,6 +75,7 @@ def main() -> None:
     p.add_argument("--run", required=True)
     p.add_argument("--samples", required=True, help="directory containing images.npy from scripts/sample.py")
     p.add_argument("--max_real", type=int, default=None, help="cap on real test slices used (default: all)")
+    p.add_argument("--max_fake", type=int, default=5000, help="use the first N samples (same N for every model)")
     p.add_argument("--skip_fid", action="store_true")
     p.add_argument("--skip_recon", action="store_true")
     p.add_argument("--no_lpips", action="store_true")
@@ -92,7 +93,7 @@ def main() -> None:
     test_ds = SliceDataset(cfg.data.processed_dir, "test", mods, hflip=False)
     val_ds = SliceDataset(cfg.data.processed_dir, "val", mods, hflip=False)
     train_ds = SliceDataset(cfg.data.processed_dir, "train", mods, hflip=False)
-    fake = np.load(samples_dir / "images.npy").astype(np.float32)
+    fake = np.load(samples_dir / "images.npy")[: args.max_fake].astype(np.float32)
     real_test = real_array(test_ds, args.max_real)
     print(f"samples {fake.shape} | real test {real_test.shape}")
 

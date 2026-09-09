@@ -21,6 +21,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 
 from synthmri.config import load_config
@@ -36,16 +37,24 @@ def load_split(cfg, split: str):
     return images, masks, ds.patient_ids
 
 
-def load_synthetic(path: Path, n: int | None, seed: int):
+def load_synthetic(path: Path, n: int | None, seed: int, allowed_patients: set[str] | None = None):
+    """Load synthetic (image, mask) pairs; optionally keep only those conditioned on masks of
+    ``allowed_patients`` (so a low-data experiment never sees masks from patients it does not own)."""
     images = np.load(path / "images.npy")
     masks_path = path / "masks.npy"
     if not masks_path.exists():
         raise FileNotFoundError(f"{path} has no masks.npy: synthetic segmentation data needs a mask-conditioned model")
     masks = np.load(masks_path)
-    if n is not None and n < images.shape[0]:
-        idx = np.random.RandomState(seed).choice(images.shape[0], n, replace=False)
-        images, masks = images[idx], masks[idx]
-    return images, masks
+    keep = np.ones(images.shape[0], dtype=bool)
+    if allowed_patients is not None:
+        meta = pd.read_csv(path / "meta.csv")
+        if "source_patient" not in meta.columns:
+            raise ValueError(f"{path}/meta.csv has no source_patient column; cannot match patients")
+        keep = meta["source_patient"].isin(allowed_patients).to_numpy()
+    idx = np.flatnonzero(keep)
+    if n is not None and n < idx.size:
+        idx = np.sort(np.random.RandomState(seed).choice(idx, n, replace=False))
+    return images[idx], masks[idx]
 
 
 def main() -> None:
@@ -56,6 +65,8 @@ def main() -> None:
     p.add_argument("--synthetic", default=None, help="sample directory with images.npy + masks.npy")
     p.add_argument("--n_synth", type=int, default=None, help="number of synthetic slices to add (default: all)")
     p.add_argument("--synthetic_only", action="store_true")
+    p.add_argument("--no_match_patients", action="store_true",
+                   help="by default synthetic slices are restricted to those conditioned on masks of the kept real patients")
     p.add_argument("--eval_synthetic", default=None, help="score the model on this synthetic set (mask consistency)")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--epochs", type=int, default=40)
@@ -77,7 +88,8 @@ def main() -> None:
     n_real, n_real_patients = int(tr_img.shape[0]), int(len(np.unique(tr_pid)))
     n_synth = 0
     if args.synthetic:
-        sy_img, sy_msk = load_synthetic(Path(args.synthetic), args.n_synth, args.seed)
+        allowed = None if (args.no_match_patients or args.synthetic_only) else set(np.unique(tr_pid).tolist())
+        sy_img, sy_msk = load_synthetic(Path(args.synthetic), args.n_synth, args.seed, allowed)
         n_synth = int(sy_img.shape[0])
         if args.synthetic_only:
             tr_img, tr_msk = sy_img.astype(np.float16), sy_msk
@@ -95,6 +107,7 @@ def main() -> None:
     results = {
         "args": vars(args), "seg_config": asdict(seg_cfg), "n_real_slices": n_real, "n_real_patients": n_real_patients,
         "n_synthetic": n_synth, "synthetic_only": bool(args.synthetic_only), "eval_split": args.eval_split,
+        "synthetic_patient_matched": bool(args.synthetic and not args.no_match_patients and not args.synthetic_only),
         "test": {"patient": {r: {k: v for k, v in m.items() if k != "values"} for r, m in test["patient"].items() if isinstance(m, dict)},
                  "mean_WT_TC_ET": test["patient"]["mean_WT_TC_ET"], "slice": test["slice"], "n_patients": test["n_patients"]},
         "test_patient_values": {r: test["patient"][r]["values"] for r in ("WT", "TC", "ET")},
