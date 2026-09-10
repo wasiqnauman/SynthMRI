@@ -18,6 +18,7 @@ N_CURVE="${N_CURVE:-2000}"              # samples per checkpoint for the FID/mem
 SEEDS="${SEEDS:-0 1 2}"
 SEG_CFG="${SEG_CFG:-configs/ldm128_maskcond.yaml}"
 SEG_EPOCHS="${SEG_EPOCHS:-40}"
+SEG_DIR="${SEG_DIR:-runs/seg}"          # e.g. SEG_DIR=runs/seg256 SEG_CFG=configs/ldm256_maskcond_reg.yaml SEG_SOURCE=runs/ldm256_maskcond_reg/samples_...
 PRETRAIN_EPOCHS="${PRETRAIN_EPOCHS:-20}"
 if [[ -z "${SEG_SOURCE:-}" ]]; then  # default: the model chosen by scripts/select_model.py, else the baseline
   SEG_MODEL=$([[ -f results/model_selection.json ]] && $PY -c "import json; print(json.load(open('results/model_selection.json'))['chosen'])" || echo ldm128_maskcond)
@@ -85,11 +86,11 @@ if has seg; then
     for frac in 0.1 0.25 1.0; do
       tag=$(printf "real%03d" "$(awk "BEGIN{print int($frac*100+0.5)}")")
       log "seg $tag seed $s"
-      seg "runs/seg/${tag}_s$s" --real_fraction "$frac" --seed "$s" --eval_synthetic "$SEG_SOURCE"
-      seg "runs/seg/${tag}_synth_s$s" --real_fraction "$frac" --seed "$s" --synthetic "$SEG_SOURCE"
+      seg "$SEG_DIR/${tag}_s$s" --real_fraction "$frac" --seed "$s" --eval_synthetic "$SEG_SOURCE"
+      seg "$SEG_DIR/${tag}_synth_s$s" --real_fraction "$frac" --seed "$s" --synthetic "$SEG_SOURCE"
     done
     log "seg synthetic-only seed $s"
-    seg "runs/seg/synthonly_s$s" --seed "$s" --synthetic "$SEG_SOURCE" --synthetic_only
+    seg "$SEG_DIR/synthonly_s$s" --seed "$s" --synthetic "$SEG_SOURCE" --synthetic_only
   done
 fi
 
@@ -98,9 +99,9 @@ if has seg2; then  # secondary analyses (docs/EXPERIMENTS.md): 1:1 synthetic, VA
     for frac in 0.1 0.25 1.0; do
       tag=$(printf "real%03d" "$(awk "BEGIN{print int($frac*100+0.5)}")")
       log "seg2 $tag seed $s"
-      seg "runs/seg/${tag}_synth1x_s$s" --real_fraction "$frac" --seed "$s" --synthetic "$SEG_SOURCE" --synth_ratio 1.0
-      seg "runs/seg/${tag}_vae_s$s" --real_fraction "$frac" --seed "$s" --real_through_vae
-      seg "runs/seg/${tag}_pre_s$s" --real_fraction "$frac" --seed "$s" --pretrain_synthetic "$SEG_SOURCE" --pretrain_epochs "$PRETRAIN_EPOCHS"
+      seg "$SEG_DIR/${tag}_synth1x_s$s" --real_fraction "$frac" --seed "$s" --synthetic "$SEG_SOURCE" --synth_ratio 1.0
+      seg "$SEG_DIR/${tag}_vae_s$s" --real_fraction "$frac" --seed "$s" --real_through_vae
+      seg "$SEG_DIR/${tag}_pre_s$s" --real_fraction "$frac" --seed "$s" --pretrain_synthetic "$SEG_SOURCE" --pretrain_epochs "$PRETRAIN_EPOCHS"
     done
   done
 fi

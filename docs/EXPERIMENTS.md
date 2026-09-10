@@ -133,6 +133,17 @@ All three use the selected model's 20,000-sample pool with the same patient matc
 directories `runs/seg/real<pct>_{synth1x,pre,vae}_s<seed>`; `collect_results.py` lists them after
 the primary rows and `make_figures.py` draws `segmentation_dice_secondary.png`.
 
+### Segmentation study at 256 px (declared 2026-09-10 09:45, after the 256 px model's generation scores and before any 256 px segmenter was trained)
+
+LDM-256-mask-reg reaches FID 10.45 against the real test slices, next to a real val-vs-test floor of
+9.55 (128 px: 20.85 vs 10.49), and the VAE ceiling rises from PSNR 26.4 / SSIM 0.83 to 29.0 / 0.88.
+Because the 128 px study attributes the TC / ET loss to missing fine detail, the primary protocol is
+repeated unchanged at 256 px: same seeds, fractions, patient matching, 40 epochs, batch 32, with the
+segmenter reading `data/processed/brats256` and the pool
+`runs/ldm256_maskcond_reg/samples_best_ddim50_cfg2_seed0` (20,000 samples). Output `runs/seg256/`;
+`collect_results.py` writes it as a second segmentation block and `make_figures.py` as
+`segmentation_dice_seg256.png`. Both resolutions are reported.
+
 ## What would strengthen the paper further
 
 * A radiology-specific feature extractor (e.g. RadImageNet) for FID, alongside Inception.

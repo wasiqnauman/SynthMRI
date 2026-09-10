@@ -1,5 +1,23 @@
 # Work log
 
+## 2026-09-10 -- 256 px model at the FID floor; segmentation study repeated at 256 px (queued)
+
+`ldm256_maskcond_reg` (dropout 0.1 + augment 6, best epoch ≈ 100): FID 10.45 / KID 6.4×10⁻³ vs the
+real test slices with a real val-vs-test floor of 9.55; 10.83 with unseen validation-patient masks;
+memorised 0.030; VAE ceiling PSNR 29.0 dB / SSIM 0.88 (128 px: 26.4 / 0.83). Since the 128 px
+segmentation loss sits in the fine regions, the primary segmentation protocol is repeated at 256 px
+(declared in EXPERIMENTS.md before any 256 px segmenter ran): `scripts/queue_2026-09-10b.sh` waits
+for the seg2 queue and then runs `SEG_DIR=runs/seg256 ... STAGES="seg collect"` (~12 h).
+Tooling: `checkpoint_curve.py` now defaults its batch size to the run's `sample.batch_size` (the
+256 px curve ran at 128 and hit a recoverable allocator OOM warning at 42 GB); `train_seg.py`
+memory-maps the synthetic pool (7.4 GB at 256 px) and reads only the selected rows;
+`run_experiments.sh` gets `SEG_DIR`; `collect_results.py` / `make_figures.py` produce one
+segmentation block / figure per `runs/seg*` directory.
+
+Files: scripts/checkpoint_curve.py, scripts/train_seg.py, scripts/run_experiments.sh, scripts/collect_results.py,
+scripts/make_figures.py, scripts/queue_2026-09-10b.sh, docs/EXPERIMENTS.md, docs/REPRODUCE.md
+Follow-ups: docs/RESULTS.md once seg2 and seg256 finish
+
 ## 2026-09-10 -- Primary segmentation study complete (3 seeds): synthetic slices help WT at 10 % real, hurt TC / ET everywhere
 
 21 segmenters finished (`runs/seg/`, selected model `ldm128_maskcond_reg`, patient-matched synthetic

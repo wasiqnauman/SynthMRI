@@ -6,8 +6,8 @@
 * <run>_loss.png                      training / validation diffusion loss per epoch
 * <run>_<samples>_real_vs_synth.png   real test slices vs generated slices, one column per modality
 * <run>_checkpoint_curve.png          loss / FID / memorisation per saved checkpoint (scripts/checkpoint_curve.py)
-* segmentation_dice.png               downstream Dice by real-data fraction, real vs real+synthetic
-* segmentation_dice_secondary.png     secondary analyses: 1:1 synthetic, synthetic pre-training, VAE-reconstructed real
+* segmentation_dice[_<dir>].png       downstream Dice by real-data fraction, real vs real+synthetic (one per runs/seg* study)
+* segmentation_dice[_<dir>]_secondary.png  secondary analyses: 1:1 synthetic, synthetic pre-training, VAE-reconstructed real
 Missing inputs are skipped, so the script can be run at any point of the experiment set.
 """
 
@@ -193,10 +193,14 @@ def _seg_bars(seg: dict, conditions: list[tuple[str, str]], filename: Path, synt
 def segmentation_figure(summary_json: Path, out: Path) -> None:
     if not summary_json.exists():
         return
-    seg = json.loads(summary_json.read_text()).get("segmentation", {})
-    _seg_bars(seg, [("real only", ""), ("real + synthetic", " + synthetic")], out / "segmentation_dice.png", synthetic_only_line=True)
-    _seg_bars(seg, [("real only", ""), ("real + synthetic (1:1)", " + synthetic 1:1"), ("synthetic pre-training, then real", ", synthetic pre-training"),
-                    ("VAE-reconstructed real only", " (VAE-reconstructed)")], out / "segmentation_dice_secondary.png", synthetic_only_line=False)
+    summary = json.loads(summary_json.read_text())
+    for key, seg in summary.items():
+        if not key.startswith("segmentation") or not seg:
+            continue
+        tag = key.replace("segmentation", "", 1)  # "" for runs/seg, "_seg256" for runs/seg256, ...
+        _seg_bars(seg, [("real only", ""), ("real + synthetic", " + synthetic")], out / f"segmentation_dice{tag}.png", synthetic_only_line=True)
+        _seg_bars(seg, [("real only", ""), ("real + synthetic (1:1)", " + synthetic 1:1"), ("synthetic pre-training, then real", ", synthetic pre-training"),
+                        ("VAE-reconstructed real only", " (VAE-reconstructed)")], out / f"segmentation_dice{tag}_secondary.png", synthetic_only_line=False)
 
 
 def main() -> None:

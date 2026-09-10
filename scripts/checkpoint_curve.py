@@ -65,7 +65,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--run", required=True)
     p.add_argument("--num_images", type=int, default=2000)
-    p.add_argument("--batch_size", type=int, default=128)
+    p.add_argument("--batch_size", type=int, default=None, help="default: the run's sample.batch_size (VAE decoding at 256 px needs a small batch)")
     p.add_argument("--steps", type=int, default=50)
     p.add_argument("--guidance_scale", type=float, default=2.0)
     p.add_argument("--mask_source", default="train", help="split whose masks condition the samples")
@@ -80,6 +80,8 @@ def main() -> None:
     cache = run / "checkpoint_curve"
     cache.mkdir(exist_ok=True)
     cfg = load_run(run, device="cpu")[0]
+    if args.batch_size is None:
+        args.batch_size = int(cfg.sample.batch_size)
     mods = cfg.data.modalities
     conditional = cfg.model.conditioning == "mask"
     guidance = args.guidance_scale if conditional else 1.0

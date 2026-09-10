@@ -47,11 +47,11 @@ def load_split(cfg, split: str):
 def load_synthetic(path: Path, n: int | None, seed: int, allowed_patients: set[str] | None = None):
     """Load synthetic (image, mask) pairs; optionally keep only those conditioned on masks of
     ``allowed_patients`` (so a low-data experiment never sees masks from patients it does not own)."""
-    images = np.load(path / "images.npy")
+    images = np.load(path / "images.npy", mmap_mode="r")  # only the selected rows are read into memory
     masks_path = path / "masks.npy"
     if not masks_path.exists():
         raise FileNotFoundError(f"{path} has no masks.npy: synthetic segmentation data needs a mask-conditioned model")
-    masks = np.load(masks_path)
+    masks = np.load(masks_path, mmap_mode="r")
     keep = np.ones(images.shape[0], dtype=bool)
     if allowed_patients is not None:
         meta = pd.read_csv(path / "meta.csv")
@@ -61,7 +61,7 @@ def load_synthetic(path: Path, n: int | None, seed: int, allowed_patients: set[s
     idx = np.flatnonzero(keep)
     if n is not None and n < idx.size:
         idx = np.sort(np.random.RandomState(seed).choice(idx, n, replace=False))
-    return images[idx], masks[idx]
+    return np.ascontiguousarray(images[idx]), np.ascontiguousarray(masks[idx])
 
 
 def main() -> None:
