@@ -13,6 +13,10 @@
 | ldm128_maskcond_reg | samples_best_ddim50_cfg1_seed0 | 20.37 | 14.74 | 46.95 | 44.23 | 69.37 | 10.49 | 0.586 / 0.652 | 10.60 / 9.96 | 0.036 |
 | ldm128_maskcond_reg | samples_best_ddim50_cfg2_seed0 | 20.85 | 15.19 | 44.33 | 43.97 | 69.57 | 10.49 | 0.584 / 0.652 | 10.71 / 9.96 | 0.043 |
 | ldm128_maskcond_reg | samples_best_ddim50_cfg2_seed0_valmasks | 22.85 | 16.52 | 45.20 | 44.06 | 71.12 | 10.49 | 0.593 / 0.652 | 11.09 / 9.96 | 0.040 |
+| ldm128_uncond_reg | samples_best_ddim50_cfg1_seed0 | 21.31 | 15.87 | 47.54 | 45.00 | 68.68 | 10.49 | 0.579 / 0.652 | 11.20 / 9.96 | 0.027 |
+| ldm256_maskcond_reg | samples_best_ddim50_cfg1_seed0 | 12.83 | 8.77 | 43.14 | 41.72 | 58.23 | 9.55 | 0.637 / 0.690 | 10.93 / 9.90 | 0.021 |
+| ldm256_maskcond_reg | samples_best_ddim50_cfg2_seed0 | 10.45 | 6.40 | 40.29 | 39.64 | 59.07 | 9.55 | 0.628 / 0.690 | 11.03 / 9.90 | 0.030 |
+| ldm256_maskcond_reg | samples_best_ddim50_cfg2_seed0_valmasks | 10.83 | 6.17 | 40.38 | 39.25 | 60.65 | 9.55 | 0.633 / 0.690 | 11.39 / 9.90 | 0.024 |
 
 ## VAE reconstruction ceiling (real test slices; frozen VAE, so it depends only on the data)
 
@@ -22,6 +26,10 @@
 | brats128 (ldm128_maskcond) | t1ce | 27.17 ± 1.96 | 0.842 ± 0.046 | 0.072 |
 | brats128 (ldm128_maskcond) | t2 | 25.39 ± 2.28 | 0.817 ± 0.049 | 0.078 |
 | brats128 (ldm128_maskcond) | rgb | 26.37 ± 1.92 | 0.833 ± 0.046 | 0.041 |
+| brats256 (ldm256_maskcond_reg) | flair | 29.65 ± 1.84 | 0.882 ± 0.035 | 0.066 |
+| brats256 (ldm256_maskcond_reg) | t1ce | 29.76 ± 1.85 | 0.885 ± 0.032 | 0.064 |
+| brats256 (ldm256_maskcond_reg) | t2 | 27.95 ± 2.06 | 0.863 ± 0.035 | 0.077 |
+| brats256 (ldm256_maskcond_reg) | rgb | 28.98 ± 1.80 | 0.877 ± 0.032 | 0.036 |
 
 ## Checkpoint curve: best-validation-loss vs last checkpoint (2,000 samples each; FID/KID vs real validation slices; memorised = fraction of samples closer to a training slice than 95 % of real held-out slices)
 
@@ -30,6 +38,8 @@
 | ldm128_maskcond | 34 | 0.0754 | 29.89 | 18.18 | 0.086 | 200 | 21.81 | 0.966 |
 | ldm128_maskcond_do01 | 41 | 0.0747 | 28.82 | 17.24 | 0.093 | 200 | 21.99 | 0.891 |
 | ldm128_maskcond_reg | 101 | 0.0710 | 24.65 | 12.86 | 0.049 | 200 | 24.43 | 0.115 |
+| ldm128_uncond_reg | 116 | 0.0723 | 24.81 | 14.75 | 0.040 | 200 | 23.20 | 0.051 |
+| ldm256_maskcond_reg | 71 | 0.0663 | 15.10 | 6.41 | 0.033 | 200 | 12.94 | 0.291 |
 
 ## Model selection (validation data only): **ldm128_maskcond_reg**
 
@@ -41,7 +51,7 @@ Rule: lowest FID vs validation slices at the best-val-loss checkpoint among runs
 | ldm128_maskcond_do01 | 41 | 28.82 | 17.24 | 0.093 |
 | ldm128_maskcond_reg **(chosen)** | 101 | 24.65 | 12.86 | 0.049 |
 
-## Downstream segmentation (per-patient Dice on held-out test patients, mean ± std over seeds; rows after the primary protocol are the secondary analyses of EXPERIMENTS.md)
+## Downstream segmentation `seg` (segmenter config `ldm128_maskcond.yaml`, synthetic pool from `ldm128_maskcond_reg`; per-patient Dice on held-out test patients, mean ± std over seeds; rows after the primary protocol are the secondary analyses of EXPERIMENTS.md)
 
 | training data | real patients | real slices | synthetic slices | seeds | WT | TC | ET | mean |
 |---|---|---|---|---|---|---|---|---|
