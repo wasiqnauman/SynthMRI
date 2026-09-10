@@ -1,9 +1,9 @@
 # Reproducing the experiments
 
 Everything below was run on one NVIDIA RTX A6000 (48 GB) with the package versions in
-`requirements-lock.txt`. A GPU with 16 GB is enough for every configuration: training peaks at about
-4.5 GB (128 px, batch 64) and 8 GB (256 px, batch 32); sampling at about 2 GB (128 px, batch 64) and
-8 GB (256 px, batch 32). Times are wall-clock on that card.
+`requirements-lock.txt`. A GPU with 16 GB is enough for every configuration: training allocates about
+5 GB (128 px, batch 64) and 5.5 GB (256 px, batch 32; ~11 GB reserved as reported by `nvidia-smi`);
+sampling about 2 GB (128 px, batch 64) and 8 GB (256 px, batch 32). Times are wall-clock on that card.
 
 ## 1. Environment
 
@@ -64,8 +64,8 @@ already exist, so it can simply be re-launched after a fix. Approximate cost:
 | stage | what | time |
 |---|---|---|
 | train each 128 px model (`ldm128_maskcond`, `_do01`, `_reg`, `ldm128_uncond*`) | 200 epochs, 49.6k steps | ~1.3 h (23 s / epoch) |
-| latent cache | once per (resolution, modalities, augmentation); `_reg` encodes 8 variants per training slice | ~1 min plain, ~7 min with `augment: 6` at 128 px (roughly 4× at 256 px) |
-| train `ldm256_maskcond*` | 200 epochs, 99.2k steps | ~5–6 h |
+| latent cache | once per (resolution, modalities, augmentation); `_reg` encodes 8 variants per training slice | ~1 min plain; with `augment: 6` ~7 min at 128 px, ~22 min at 256 px |
+| train `ldm256_maskcond*` | 200 epochs, 99.2k steps | ~2.9 h (51 s / epoch) |
 | sample + evaluate | per mask model: 20,000 samples (training masks, g = 2), 5,000 (g = 1), 5,000 (validation masks, g = 2); per unconditional model 5,000; FID/KID, diversity, memorisation | ~1–2 h total |
 | checkpoint curve | 2,000 samples per saved checkpoint, FID vs val + memorisation | ~30 min per model |
 | segmentation study | 21 U-Nets × 40 epochs (3 seeds × {10 %, 25 %, 100 %} × {real, real + synthetic} + synthetic-only) | ~3–4 h |
