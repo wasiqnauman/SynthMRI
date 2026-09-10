@@ -6,10 +6,11 @@ which `scripts/collect_results.py` regenerates from the run directories under `r
 `best/` weights (lowest validation diffusion loss, EMA) and 5,000 DDIM-50 samples unless stated;
 segmentation Dice is per-patient on the 74 held-out test patients, mean ± std over 3 seeds.
 
-Status (2026-09-10 11:10): the diffusion models, the checkpoint curves, the model selection and the
-primary 128 px segmentation study are complete. Two pre-declared follow-ups are still running and
-their sections are marked *pending*: the secondary segmentation analyses (`runs/seg/*_{synth1x,vae,pre}_*`,
-started 11:00, ≈ 4 h) and the repeat of the segmentation study at 256 px (`runs/seg256/`, ≈ 12 h after that).
+Status (2026-09-10 13:45): the diffusion models, the checkpoint curves, the model selection, the
+primary 128 px segmentation study and its secondary analyses are complete. Three pre-declared
+follow-ups are queued back to back and their sections are marked *pending*: the segmentation study
+at 256 px (section 6, running), the compute-matched pre-training control (section 8) and the VAE
+decoder fine-tune study (section 7).
 
 ## Headline findings
 
@@ -25,12 +26,18 @@ started 11:00, ≈ 4 h) and the repeat of the segmentation study at 256 px (`run
 3. **At 256 px the regularised model is near the resolution's floor.** LDM-256-mask-reg: FID 10.45
    vs the real test slices, where two disjoint sets of *real* slices (val vs test) score 9.55;
    memorised 0.030; 10.83 with tumour masks of patients it never saw.
-4. **Synthetic slices did not improve the 128 px tumour segmenter.** Adding patient-matched synthetic
-   pairs raises whole-tumour Dice slightly at 10 % real data (0.801 → 0.809) but lowers tumour-core
-   and enhancing-tumour Dice at every data fraction (ET at 10 %: 0.509 → 0.430; mean Dice at 100 %:
-   0.778 → 0.757). A segmenter trained on synthetic data alone reaches 0.660 mean Dice, about the
-   level of 10 % real data. Real-trained segmenters recover the conditioning mask in the synthetic
-   images with ET Dice ≈ 0.49, so the generated enhancing-tumour appearance is the weak link.
+4. **Mixing synthetic slices into training did not improve the 128 px tumour segmenter.** Adding
+   patient-matched synthetic pairs raises whole-tumour Dice slightly at 10 % real data
+   (0.801 → 0.809) but lowers tumour-core and enhancing-tumour Dice at every data fraction (ET at
+   10 %: 0.509 → 0.430; mean Dice at 100 %: 0.778 → 0.757). A segmenter trained on synthetic data
+   alone reaches 0.660 mean Dice, about the level of 10 % real data.
+5. **The loss is the frozen VAE's, not the diffusion model's.** Real slices merely passed through the
+   frozen VAE (no generator) cost more Dice than the synthetic slices do (−0.057 to −0.072 mean,
+   ET −0.11 to −0.14), and halving the synthetic ratio barely helps. The natural-image decoder
+   removes enhancing-tumour detail; every synthetic image inherits that.
+6. **Used as pre-training instead of as extra training data, the synthetic pairs help when real data
+   is scarce**: +0.044 mean Dice at 10 % real (ET 0.509 → 0.564), +0.015 at 25 %, nothing at 100 %,
+   subject to the compute-matched control that is still running.
 
 ## 1. Memorisation vs training length (checkpoint curves)
 
@@ -133,21 +140,66 @@ a blurred ET/TC appearance, which is why the loss is largest on ET and shows up 
 real data. Synthetic-only training reaching 0.660 confirms that the pairs are label-consistent
 enough to be usable, but not sharper than what 26 real patients provide.
 
-## 5. Secondary segmentation analyses (*pending*)
+## 5. Secondary segmentation analyses (128 px)
 
-Declared in [EXPERIMENTS.md](EXPERIMENTS.md) after the first seed-0 results; running since
-2026-09-10 11:00 (`runs/seg/real<pct>_{synth1x,vae,pre}_s<seed>`, 27 U-Nets). They ask whether
-the loss comes from the 1.25:1 synthetic ratio (→ 1:1), whether pre-training on synthetic then
-fine-tuning on real helps where mixing does not, and how much of the gap is the frozen VAE's own
-blur (real slices replaced by their VAE reconstruction). Table and
-`figures/segmentation_dice_secondary.png` will be added when `collect_results.py` runs at the end
-of the queue.
+Declared in [EXPERIMENTS.md](EXPERIMENTS.md) after the first seed-0 results, run with the same 3 seeds,
+patient matching and 40-epoch schedule (`runs/seg/real<pct>_{synth1x,vae,pre}_s<seed>`).
+Figure: `figures/segmentation_dice_secondary.png`.
+
+| training data | WT | TC | ET | mean | Δ mean vs real only |
+|---|---|---|---|---|---|
+| 10 % real | 0.801 ± 0.011 | 0.580 ± 0.023 | 0.509 ± 0.022 | 0.630 ± 0.016 | |
+| 10 % real + synthetic (1.25:1, primary) | 0.809 ± 0.006 | 0.559 ± 0.010 | 0.430 ± 0.033 | 0.600 ± 0.014 | −0.030 |
+| 10 % real + synthetic 1:1 | 0.816 ± 0.002 | 0.572 ± 0.008 | 0.442 ± 0.007 | 0.610 ± 0.006 | −0.020 |
+| 10 % real, VAE-reconstructed | 0.786 ± 0.016 | 0.535 ± 0.029 | 0.397 ± 0.028 | 0.573 ± 0.023 | −0.057 |
+| 10 % real, synthetic pre-training | 0.830 ± 0.003 | 0.628 ± 0.013 | 0.564 ± 0.012 | 0.674 ± 0.008 | **+0.044** |
+| 25 % real | 0.847 ± 0.003 | 0.676 ± 0.011 | 0.611 ± 0.010 | 0.711 ± 0.004 | |
+| 25 % real + synthetic (1.25:1, primary) | 0.844 ± 0.004 | 0.660 ± 0.021 | 0.521 ± 0.014 | 0.675 ± 0.012 | −0.036 |
+| 25 % real + synthetic 1:1 | 0.844 ± 0.007 | 0.668 ± 0.018 | 0.549 ± 0.008 | 0.687 ± 0.011 | −0.024 |
+| 25 % real, VAE-reconstructed | 0.822 ± 0.005 | 0.621 ± 0.009 | 0.475 ± 0.006 | 0.639 ± 0.003 | −0.072 |
+| 25 % real, synthetic pre-training | 0.858 ± 0.003 | 0.700 ± 0.010 | 0.620 ± 0.006 | 0.726 ± 0.005 | **+0.015** |
+| 100 % real | 0.886 ± 0.001 | 0.775 ± 0.005 | 0.673 ± 0.004 | 0.778 ± 0.003 | |
+| 100 % real + synthetic (1.25:1, primary) | 0.879 ± 0.001 | 0.742 ± 0.009 | 0.650 ± 0.010 | 0.757 ± 0.006 | −0.021 |
+| 100 % real + synthetic 1:1 | 0.878 ± 0.004 | 0.757 ± 0.007 | 0.643 ± 0.013 | 0.760 ± 0.004 | −0.018 |
+| 100 % real, VAE-reconstructed | 0.862 ± 0.006 | 0.713 ± 0.008 | 0.542 ± 0.026 | 0.706 ± 0.006 | −0.072 |
+| 100 % real, synthetic pre-training | 0.889 ± 0.002 | 0.770 ± 0.007 | 0.677 ± 0.001 | 0.779 ± 0.003 | +0.001 |
+
+Three answers to the questions posed in the declaration:
+
+* **The synthetic ratio is not the cause.** Capping synthetic slices at 1:1 recovers only about a
+  third of the loss (mean −0.020 / −0.024 / −0.018 instead of −0.030 / −0.036 / −0.021); ET stays
+  0.03–0.07 below real only at every fraction.
+* **The frozen VAE alone reproduces the loss, and more.** Real slices passed through
+  `decode(encode(x))` of the frozen `sd-vae-ft-mse`, with no generator involved, cost −0.057 /
+  −0.072 / −0.072 mean Dice, again concentrated on ET (−0.11 to −0.14). Every synthetic image carries
+  exactly this decoder, so the enhancing-tumour detail the segmenter needs is removed before the
+  diffusion model is even involved. This motivates the decoder fine-tune of section 7.
+* **Pre-training on synthetic pairs, then fine-tuning on real, helps in the low-data regime.**
+  +0.044 mean Dice at 10 % real (all three regions, ET 0.509 → 0.564, 3/3 seeds), +0.015 at 25 %,
+  nothing at 100 %. Fine-tuning on real slices overrides the blurred appearance that mixing bakes
+  in, while the pre-trained features still transfer. The pre-trained runs receive 20 extra epochs,
+  so a compute-matched control (the same 20 epochs of pre-training on the real slices themselves,
+  `runs/seg/real<pct>_prereal_s<seed>`) is queued; the gain is claimed only if it survives that
+  control (section 8, *pending*).
 
 ## 6. Segmentation study at 256 px (*pending*)
 
 Same protocol with the 256 px data and the LDM-256-mask-reg pool (`runs/seg256/`), declared before
-any 256 px segmenter was trained; queued after the secondary analyses (≈ 12 h). It tests whether
-the near-floor 256 px generator, with a higher VAE ceiling, changes the conclusion of section 4.
+any 256 px segmenter was trained; running since 2026-09-10 13:38 (≈ 12 h). It tests whether the
+near-floor 256 px generator, with a higher VAE ceiling, changes the conclusion of section 4.
+
+## 7. VAE decoder fine-tuning (*pending*)
+
+Declared after section 5's VAE control: only `decoder` + `post_quant_conv` of the VAE are fine-tuned
+on the 128 px training slices (L1 + LPIPS, validation-selected epoch), the same latents are decoded
+again with the new decoder, and the primary + secondary segmentation study is repeated with that
+pool (`runs/vae_dec_brats128/`, `runs/seg_ftdec/`). Pre-declared readings are in
+[EXPERIMENTS.md](EXPERIMENTS.md); queued after section 8 (≈ 10 h).
+
+## 8. Compute-matched control for synthetic pre-training (*pending*)
+
+`runs/seg/real<pct>_prereal_s<seed>`: 20 epochs of pre-training on the real slices themselves, then
+the same fine-tuning; queued after section 6 (≈ 1.5 h).
 
 ## Limitations
 

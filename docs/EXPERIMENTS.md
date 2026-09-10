@@ -156,7 +156,7 @@ segmenter reading `data/processed/brats256` and the pool
 ### VAE decoder fine-tuning (declared 2026-09-10 11:50, after the seed-0 secondary results at 10 % and 25 % real and before any decoder was trained)
 
 The VAE-reconstructed-real control reproduces the loss on its own (seed 0: 10 % real 0.652 → 0.604,
-25 % real 0.708 → *pending*), i.e. the frozen natural-image decoder discards enhancing-tumour detail
+25 % real 0.708 → 0.635, the latter seen after this declaration), i.e. the frozen natural-image decoder discards enhancing-tumour detail
 before the diffusion model is even involved. `scripts/finetune_vae_decoder.py` trains only
 `decoder` + `post_quant_conv` of `sd-vae-ft-mse` on the 128 px training slices (L1 + 0.5·LPIPS-VGG
 per channel, AdamW 2e-5, batch 16, 8 epochs, horizontal flips; the epoch with the lowest validation

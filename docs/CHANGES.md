@@ -1,5 +1,17 @@
 # Work log
 
+## 2026-09-10 -- Secondary segmentation analyses complete (3 seeds)
+
+`seg2` finished 13:38 (27 U-Nets). Relative to real only, mean Dice: 1:1 mixing −0.020 / −0.024 /
+−0.018 (10 / 25 / 100 % real), VAE-reconstructed real only −0.057 / −0.072 / −0.072, synthetic
+pre-training then fine-tuning +0.044 / +0.015 / +0.001. The frozen VAE alone reproduces the loss of
+the primary protocol; pre-training helps in the low-data regime pending the `seg3` control.
+RESULTS.md section 5 written from `docs/results_tables.md`; the segmentation table header now
+names every synthetic pool used (was `?` when the first group had no synthetic slices).
+
+Files: docs/RESULTS.md, docs/results_tables.md, results/summary.json, docs/figures/segmentation_dice_secondary.png, scripts/collect_results.py
+Follow-ups: sections 6–8 of RESULTS.md as seg256, seg3 and the decoder study finish
+
 ## 2026-09-10 -- VAE decoder fine-tuning (queued) and pre-training control
 
 The VAE-reconstructed-real control alone reproduces the segmentation loss at 10 % real (seed 0:

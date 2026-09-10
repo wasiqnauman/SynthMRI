@@ -18,18 +18,18 @@
 | ldm256_maskcond_reg | samples_best_ddim50_cfg2_seed0 | 10.45 | 6.40 | 40.29 | 39.64 | 59.07 | 9.55 | 0.628 / 0.690 | 11.03 / 9.90 | 0.030 |
 | ldm256_maskcond_reg | samples_best_ddim50_cfg2_seed0_valmasks | 10.83 | 6.17 | 40.38 | 39.25 | 60.65 | 9.55 | 0.633 / 0.690 | 11.39 / 9.90 | 0.024 |
 
-## VAE reconstruction ceiling (real test slices; frozen VAE, so it depends only on the data)
+## VAE reconstruction ceiling (real test slices; depends only on the data and the decoder, not on the diffusion model)
 
-| data | channel | PSNR (dB) | SSIM | LPIPS |
-|---|---|---|---|---|
-| brats128 (ldm128_maskcond) | flair | 27.00 ± 1.93 | 0.839 ± 0.049 | 0.062 |
-| brats128 (ldm128_maskcond) | t1ce | 27.17 ± 1.96 | 0.842 ± 0.046 | 0.072 |
-| brats128 (ldm128_maskcond) | t2 | 25.39 ± 2.28 | 0.817 ± 0.049 | 0.078 |
-| brats128 (ldm128_maskcond) | rgb | 26.37 ± 1.92 | 0.833 ± 0.046 | 0.041 |
-| brats256 (ldm256_maskcond_reg) | flair | 29.65 ± 1.84 | 0.882 ± 0.035 | 0.066 |
-| brats256 (ldm256_maskcond_reg) | t1ce | 29.76 ± 1.85 | 0.885 ± 0.032 | 0.064 |
-| brats256 (ldm256_maskcond_reg) | t2 | 27.95 ± 2.06 | 0.863 ± 0.035 | 0.077 |
-| brats256 (ldm256_maskcond_reg) | rgb | 28.98 ± 1.80 | 0.877 ± 0.032 | 0.036 |
+| data | decoder | channel | PSNR (dB) | SSIM | LPIPS |
+|---|---|---|---|---|---|
+| brats128 (ldm128_maskcond) | frozen | flair | 27.00 ± 1.93 | 0.839 ± 0.049 | 0.062 |
+| brats128 (ldm128_maskcond) | frozen | t1ce | 27.17 ± 1.96 | 0.842 ± 0.046 | 0.072 |
+| brats128 (ldm128_maskcond) | frozen | t2 | 25.39 ± 2.28 | 0.817 ± 0.049 | 0.078 |
+| brats128 (ldm128_maskcond) | frozen | rgb | 26.37 ± 1.92 | 0.833 ± 0.046 | 0.041 |
+| brats256 (ldm256_maskcond_reg) | frozen | flair | 29.65 ± 1.84 | 0.882 ± 0.035 | 0.066 |
+| brats256 (ldm256_maskcond_reg) | frozen | t1ce | 29.76 ± 1.85 | 0.885 ± 0.032 | 0.064 |
+| brats256 (ldm256_maskcond_reg) | frozen | t2 | 27.95 ± 2.06 | 0.863 ± 0.035 | 0.077 |
+| brats256 (ldm256_maskcond_reg) | frozen | rgb | 28.98 ± 1.80 | 0.877 ± 0.032 | 0.036 |
 
 ## Checkpoint curve: best-validation-loss vs last checkpoint (2,000 samples each; FID/KID vs real validation slices; memorised = fraction of samples closer to a training slice than 95 % of real held-out slices)
 
@@ -57,10 +57,19 @@ Rule: lowest FID vs validation slices at the best-val-loss checkpoint among runs
 |---|---|---|---|---|---|---|---|---|
 | 10% real | 26 | 1483–1705 | 0 | 3 | 0.801 ± 0.011 | 0.580 ± 0.023 | 0.509 ± 0.022 | 0.630 ± 0.016 |
 | 10% real + synthetic | 26 | 1483–1705 | 1845–2208 | 3 | 0.809 ± 0.006 | 0.559 ± 0.010 | 0.430 ± 0.033 | 0.600 ± 0.014 |
+| 10% real (VAE-reconstructed) | 26 | 1483–1705 | 0 | 3 | 0.786 ± 0.016 | 0.535 ± 0.029 | 0.397 ± 0.028 | 0.573 ± 0.023 |
+| 10% real, synthetic pre-training | 26 | 1483–1705 | 0 | 3 | 0.830 ± 0.003 | 0.628 ± 0.013 | 0.564 ± 0.012 | 0.674 ± 0.008 |
+| 10% real + synthetic 1:1 | 26 | 1483–1705 | 1483–1705 | 3 | 0.816 ± 0.002 | 0.572 ± 0.008 | 0.442 ± 0.007 | 0.610 ± 0.006 |
 | 25% real | 64 | 3937–4031 | 0 | 3 | 0.847 ± 0.003 | 0.676 ± 0.011 | 0.611 ± 0.010 | 0.711 ± 0.004 |
 | 25% real + synthetic | 64 | 3937–4031 | 4913–5158 | 3 | 0.844 ± 0.004 | 0.660 ± 0.021 | 0.521 ± 0.014 | 0.675 ± 0.012 |
+| 25% real (VAE-reconstructed) | 64 | 3937–4031 | 0 | 3 | 0.822 ± 0.005 | 0.621 ± 0.009 | 0.475 ± 0.006 | 0.639 ± 0.003 |
+| 25% real, synthetic pre-training | 64 | 3937–4031 | 0 | 3 | 0.858 ± 0.003 | 0.700 ± 0.010 | 0.620 ± 0.006 | 0.726 ± 0.005 |
+| 25% real + synthetic 1:1 | 64 | 3937–4031 | 3937–4031 | 3 | 0.844 ± 0.007 | 0.668 ± 0.018 | 0.549 ± 0.008 | 0.687 ± 0.011 |
 | 100% real | 258 | 15895 | 0 | 3 | 0.886 ± 0.001 | 0.775 ± 0.005 | 0.673 ± 0.004 | 0.778 ± 0.003 |
 | 100% real + synthetic | 258 | 15895 | 20000 | 3 | 0.879 ± 0.001 | 0.742 ± 0.009 | 0.650 ± 0.010 | 0.757 ± 0.006 |
+| 100% real (VAE-reconstructed) | 258 | 15895 | 0 | 3 | 0.862 ± 0.006 | 0.713 ± 0.008 | 0.542 ± 0.026 | 0.706 ± 0.006 |
+| 100% real, synthetic pre-training | 258 | 15895 | 0 | 3 | 0.889 ± 0.002 | 0.770 ± 0.007 | 0.677 ± 0.001 | 0.779 ± 0.003 |
+| 100% real + synthetic 1:1 | 258 | 15895 | 15895 | 3 | 0.878 ± 0.004 | 0.757 ± 0.007 | 0.643 ± 0.013 | 0.760 ± 0.004 |
 | synthetic only | 0 | 0 | 20000 | 3 | 0.829 ± 0.002 | 0.669 ± 0.007 | 0.481 ± 0.012 | 0.660 ± 0.005 |
 
 ## Mask consistency of synthetic samples (per-slice Dice of a real-trained segmenter vs the conditioning mask, mean ± std over seeds)

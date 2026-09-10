@@ -174,7 +174,8 @@ def segmentation_tables(runs_dir: Path, seg_dir: str = "seg") -> tuple[list[str]
     if not groups:
         return [], {}
     any_run = next(iter(groups.values()))[0]
-    src = Path(any_run["args"].get("synthetic") or any_run["args"].get("eval_synthetic") or "").parent.name or "?"
+    srcs = {Path(r["args"][k]).parent.name for rs in groups.values() for r in rs for k in ("synthetic", "eval_synthetic", "pretrain_synthetic") if r["args"].get(k)}
+    src = ", ".join(sorted(srcs)) or "?"
     lines = [f"## Downstream segmentation `{seg_dir}` (segmenter config `{Path(any_run['args']['config']).name}`, synthetic pool from `{src}`; "
              "per-patient Dice on held-out test patients, mean ± std over seeds; "
              "rows after the primary protocol are the secondary analyses of EXPERIMENTS.md)", "",
