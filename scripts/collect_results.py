@@ -124,6 +124,8 @@ def seg_variant(r: dict) -> str:
         return "VAE-reconstructed real"
     if a.get("pretrain_synthetic"):
         return "synthetic pre-training"
+    if a.get("pretrain_real"):
+        return "real pre-training (control)"
     if a.get("synth_ratio") is not None:
         return f"synthetic {a['synth_ratio']:g}:1"
     return ""
@@ -138,6 +140,8 @@ def seg_name(key: tuple) -> str:
         return f"{name} (VAE-reconstructed)"
     if variant == "synthetic pre-training":
         return f"{name}, synthetic pre-training"
+    if variant == "real pre-training (control)":
+        return f"{name}, real pre-training (control)"
     if variant:
         return f"{name} + {variant}"
     return name + (" + synthetic" if synth else "")

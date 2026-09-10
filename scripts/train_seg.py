@@ -15,7 +15,8 @@ which measures how faithfully generated images follow their conditioning masks.
 Secondary analyses (docs/EXPERIMENTS.md): ``--synth_ratio 1.0`` caps the synthetic slices at the
 number of real slices; ``--real_through_vae`` replaces the real training images by their frozen-VAE
 reconstructions (isolates the VAE ceiling from the generator); ``--pretrain_synthetic DIR`` first
-trains on the synthetic pairs alone for ``--pretrain_epochs`` and then fine-tunes on the real slices.
+trains on the synthetic pairs alone for ``--pretrain_epochs`` and then fine-tunes on the real slices;
+``--pretrain_real`` is its compute-matched control (the same extra epochs on the real slices themselves).
 """
 
 from __future__ import annotations
@@ -75,6 +76,7 @@ def main() -> None:
     p.add_argument("--synthetic_only", action="store_true")
     p.add_argument("--real_through_vae", action="store_true", help="control: real training images replaced by their frozen-VAE reconstructions")
     p.add_argument("--pretrain_synthetic", default=None, help="sample directory: train on it alone first, then fine-tune on the real slices")
+    p.add_argument("--pretrain_real", action="store_true", help="control for --pretrain_synthetic: pre-train on the real slices themselves")
     p.add_argument("--pretrain_epochs", type=int, default=20)
     p.add_argument("--no_match_patients", action="store_true",
                    help="by default synthetic slices are restricted to those conditioned on masks of the kept real patients")
@@ -102,15 +104,23 @@ def main() -> None:
         tr_img = vae_roundtrip(tr_img, vae, device)
         del vae
         torch.cuda.empty_cache()
-    n_synth, n_pretrain = 0, 0
+    n_synth, n_pretrain, n_pretrain_real = 0, 0, 0
     allowed = None if (args.no_match_patients or args.synthetic_only) else set(np.unique(tr_pid).tolist())
     init_state = None
-    if args.pretrain_synthetic:
-        pre_img, pre_msk = load_synthetic(Path(args.pretrain_synthetic), args.n_synth, args.seed, allowed)
-        n_pretrain = int(pre_img.shape[0])
+    if args.pretrain_synthetic and args.pretrain_real:
+        raise SystemExit("--pretrain_synthetic and --pretrain_real are alternatives")
+    if args.pretrain_synthetic or args.pretrain_real:
+        if args.pretrain_synthetic:
+            pre_img, pre_msk = load_synthetic(Path(args.pretrain_synthetic), args.n_synth, args.seed, allowed)
+            n_pretrain = int(pre_img.shape[0])
+            what = f"{n_pretrain} synthetic slices"
+        else:  # compute-matched control: the same extra epochs on the real slices themselves
+            pre_img, pre_msk = tr_img, tr_msk
+            n_pretrain_real = n_real
+            what = f"the {n_real} real slices (control)"
         va_img, va_msk, va_pid = load_split(cfg, "val")
         pre_cfg = SegConfig(epochs=args.pretrain_epochs, batch_size=args.batch_size, lr=args.lr, seed=args.seed, in_channels=len(cfg.data.modalities), max_steps=args.max_steps)
-        print(f"pre-training on {n_pretrain} synthetic slices for {args.pretrain_epochs} epochs")
+        print(f"pre-training on {what} for {args.pretrain_epochs} epochs")
         pre_model, _ = train_segmenter(pre_img.astype(np.float16), pre_msk, va_img, va_msk, va_pid, pre_cfg, out / "pretrain", device)
         init_state = {k: v.detach().cpu().clone() for k, v in pre_model.state_dict().items()}
         del pre_model
@@ -135,7 +145,8 @@ def main() -> None:
         "args": vars(args), "seg_config": asdict(seg_cfg), "n_real_slices": n_real, "n_real_patients": n_real_patients,
         "n_synthetic": n_synth, "synthetic_only": bool(args.synthetic_only), "eval_split": args.eval_split,
         "synth_ratio": args.synth_ratio, "real_through_vae": bool(args.real_through_vae),
-        "n_pretrain_synthetic": n_pretrain, "pretrain_epochs": args.pretrain_epochs if args.pretrain_synthetic else 0,
+        "n_pretrain_synthetic": n_pretrain, "n_pretrain_real": n_pretrain_real,
+        "pretrain_epochs": args.pretrain_epochs if (args.pretrain_synthetic or args.pretrain_real) else 0,
         "synthetic_patient_matched": bool(args.synthetic and not args.no_match_patients and not args.synthetic_only),
         "test": {"patient": {r: {k: v for k, v in m.items() if k != "values"} for r, m in test["patient"].items() if isinstance(m, dict)},
                  "mean_WT_TC_ET": test["patient"]["mean_WT_TC_ET"], "slice": test["slice"], "n_patients": test["n_patients"]},

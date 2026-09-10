@@ -19,9 +19,16 @@ epoch 71; 12.94 / 0.291 at epoch 200 — the regularised model also starts copyi
 draft of `docs/RESULTS.md` written from the finished runs, with the secondary analyses and the
 256 px study marked pending.
 
+Seed-0 secondary results at 10 % real (seen 11:08): mixing 1:1 = 0.616, VAE-reconstructed real only = 0.604
+(vs 0.652 real only) — the frozen VAE's blur alone reproduces the loss; synthetic pre-training then
+fine-tuning = 0.684. Because pre-training adds 20 epochs, a compute-matched control (`--pretrain_real`,
+stage `seg3`, 9 U-Nets) was declared in EXPERIMENTS.md and queued after the 256 px study
+(`scripts/queue_2026-09-10c.sh`); `collect_results.py` / `make_figures.py` label it
+"real pre-training (control)".
+
 Files: scripts/checkpoint_curve.py, scripts/train_seg.py, scripts/run_experiments.sh, scripts/collect_results.py,
-scripts/make_figures.py, scripts/queue_2026-09-10b.sh, docs/EXPERIMENTS.md, docs/REPRODUCE.md, docs/RESULTS.md
-Follow-ups: fill RESULTS.md sections 5 and 6 once seg2 and seg256 finish
+scripts/make_figures.py, scripts/queue_2026-09-10b.sh, scripts/queue_2026-09-10c.sh, docs/EXPERIMENTS.md, docs/REPRODUCE.md, docs/RESULTS.md
+Follow-ups: fill RESULTS.md sections 5 and 6 once seg2, seg256 and seg3 finish
 
 ## 2026-09-10 -- Primary segmentation study complete (3 seeds): synthetic slices help WT at 10 % real, hurt TC / ET everywhere
 

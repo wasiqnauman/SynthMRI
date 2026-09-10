@@ -133,6 +133,15 @@ All three use the selected model's 20,000-sample pool with the same patient matc
 directories `runs/seg/real<pct>_{synth1x,pre,vae}_s<seed>`; `collect_results.py` lists them after
 the primary rows and `make_figures.py` draws `segmentation_dice_secondary.png`.
 
+#### Control for the pre-training condition (declared 2026-09-10 11:10, after the seed-0 results of the 10 % secondary conditions and before the 25 % / 100 % ones)
+
+At 10 % real data (seed 0) synthetic pre-training raised mean Dice from 0.652 to 0.684 while mixing
+lowered it. The pre-trained segmenter has seen 20 extra epochs, so the gain could come from the
+longer schedule rather than from the synthetic slices. Control: `--pretrain_real` pre-trains for the
+same 20 epochs on the real slices themselves, then fine-tunes exactly as the synthetic-pre-training
+runs do (same seeds and fractions; `runs/seg/real<pct>_prereal_s<seed>`, stage `seg3`). The
+synthetic pre-training condition counts as a real effect only if it also beats this control.
+
 ### Segmentation study at 256 px (declared 2026-09-10 09:45, after the 256 px model's generation scores and before any 256 px segmenter was trained)
 
 LDM-256-mask-reg reaches FID 10.45 against the real test slices, next to a real val-vs-test floor of

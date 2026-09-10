@@ -29,7 +29,7 @@ from synthmri.data.dataset import SliceDataset  # noqa: E402
 from synthmri.utils.viz import colorize_mask  # noqa: E402
 
 # Fixed categorical order (colour-blind-validated): blue, orange, aqua, yellow.
-SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]
+SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#8a63d2"]
 INK, INK2, GRID = "#0b0b0b", "#52514e", "#e6e5e1"
 
 
@@ -200,6 +200,7 @@ def segmentation_figure(summary_json: Path, out: Path) -> None:
         tag = key.replace("segmentation", "", 1)  # "" for runs/seg, "_seg256" for runs/seg256, ...
         _seg_bars(seg, [("real only", ""), ("real + synthetic", " + synthetic")], out / f"segmentation_dice{tag}.png", synthetic_only_line=True)
         _seg_bars(seg, [("real only", ""), ("real + synthetic (1:1)", " + synthetic 1:1"), ("synthetic pre-training, then real", ", synthetic pre-training"),
+                        ("real pre-training, then real (control)", ", real pre-training (control)"),
                         ("VAE-reconstructed real only", " (VAE-reconstructed)")], out / f"segmentation_dice{tag}_secondary.png", synthetic_only_line=False)
 
 

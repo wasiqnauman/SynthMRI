@@ -3,13 +3,13 @@
 # exist are skipped, so the script can be re-run after an interruption.
 #   bash scripts/run_experiments.sh                                          # everything
 #   STAGES="train sample eval curve" MODELS="ldm128_maskcond" bash scripts/run_experiments.sh
-#   STAGES="seg seg2 collect" bash scripts/run_experiments.sh                # only the downstream study
+#   STAGES="seg seg2 seg3 collect" bash scripts/run_experiments.sh           # only the downstream study
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 PY="${PYTHON:-python}"
-STAGES="${STAGES:-preprocess train sample eval curve seg seg2 collect}"
+STAGES="${STAGES:-preprocess train sample eval curve seg seg2 seg3 collect}"
 MODELS="${MODELS:-ldm128_maskcond ldm128_maskcond_do01 ldm128_maskcond_reg ldm128_uncond ldm128_uncond_reg ldm256_maskcond_reg}"
 CKPT="${CKPT:-best}"                    # checkpoint behind every reported sample set (lowest validation loss)
 N_SAMPLES="${N_SAMPLES:-5000}"          # samples per model/setting for FID/KID etc.
@@ -102,6 +102,16 @@ if has seg2; then  # secondary analyses (docs/EXPERIMENTS.md): 1:1 synthetic, VA
       seg "$SEG_DIR/${tag}_synth1x_s$s" --real_fraction "$frac" --seed "$s" --synthetic "$SEG_SOURCE" --synth_ratio 1.0
       seg "$SEG_DIR/${tag}_vae_s$s" --real_fraction "$frac" --seed "$s" --real_through_vae
       seg "$SEG_DIR/${tag}_pre_s$s" --real_fraction "$frac" --seed "$s" --pretrain_synthetic "$SEG_SOURCE" --pretrain_epochs "$PRETRAIN_EPOCHS"
+    done
+  done
+fi
+
+if has seg3; then  # compute-matched control for the synthetic pre-training condition
+  for s in $SEEDS; do
+    for frac in 0.1 0.25 1.0; do
+      tag=$(printf "real%03d" "$(awk "BEGIN{print int($frac*100+0.5)}")")
+      log "seg3 $tag seed $s"
+      seg "$SEG_DIR/${tag}_prereal_s$s" --real_fraction "$frac" --seed "$s" --pretrain_real --pretrain_epochs "$PRETRAIN_EPOCHS"
     done
   done
 fi
