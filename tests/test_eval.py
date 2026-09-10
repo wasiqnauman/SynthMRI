@@ -72,6 +72,14 @@ def test_diversity_and_memorisation(tmp_path):
     assert same["pairwise_ssim_mean"] == pytest.approx(1.0)
     d, i = nearest_neighbour_distances(ref[:3], ref, device="cpu", feat_size=16)
     assert np.allclose(d, 0, atol=1e-3) and i.tolist() == [0, 1, 2]
+    # a mirrored copy of a training image is a copy: caught only when the reference includes flips
+    flipped = ref[:1, :, :, ::-1].copy()
+    d_flip, i_flip = nearest_neighbour_distances(flipped, ref, device="cpu", feat_size=16)
+    assert d_flip[0] == pytest.approx(0, abs=1e-3) and i_flip[0] == len(ref)  # index N + 0 = image 0, flipped
+    d_noflip, _ = nearest_neighbour_distances(flipped, ref, device="cpu", feat_size=16, include_flips=False)
+    assert d_noflip[0] > 0.5
+    assert memorisation_report(flipped, ref, ref[5:], device="cpu", feat_size=16)["reference"] == "train+hflip"
+    save_nearest_neighbour_figure(flipped, ref, i_flip, tmp_path / "nn_flip.png", n=1, dists=d_flip)
     rep = memorisation_report(ref[:3] + 0.01, ref, ref[5:], device="cpu", feat_size=16)
     assert set(rep) >= {"fake_to_train_nn_dist", "test_to_train_nn_dist", "frac_fake_closer_than_test_p5"}
     save_nearest_neighbour_figure(ref[:3], ref, i, tmp_path / "nn.png", n=2, dists=d)

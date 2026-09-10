@@ -1,5 +1,22 @@
 # Work log
 
+## 2026-09-09 -- Memorisation check now looks at training slices in both orientations
+
+The first in-repo checkpoint curve of LDM-128-mask disagreed with the interim rows: with
+conditioning masks flipped at random (as in every sample set), the fraction of memorised samples at
+epochs 150–200 came out at ≈ 0.47, whereas the interim rows with unflipped masks gave 0.71 at
+epoch 100. A sample that reproduces a *mirrored* training slice was not being caught because the
+nearest-neighbour search only saw unflipped training slices. `nearest_neighbour_distances` /
+`memorisation_report` now append the mirrored training set to the reference by default
+(`include_flips`, index `>= N` = flipped image `i - N`; the nearest-neighbour figure shows the
+mirrored slice), rows record `reference: train+hflip`, and `scripts/checkpoint_curve.py`
+recomputes cached rows that used another reference. The baseline curve and its three evaluations
+were rerun with the corrected check (interim epoch-60/100 rows keep a note). Memorised fractions
+can only go up under the new reference, never down.
+
+Files: synthmri/eval/diversity.py, scripts/checkpoint_curve.py, tests/test_eval.py, docs/EXPERIMENTS.md
+Follow-ups: none
+
 ## 2026-09-09 -- Result tables: checkpoint-curve summary, model-selection table, memorised-fraction column
 
 `scripts/collect_results.py` now writes, next to the generative-quality table (which gains the

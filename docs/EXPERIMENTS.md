@@ -34,9 +34,9 @@ the last epoch. The validation loss is computed with fixed noise and timesteps s
 minimum early (epoch 34) and then rises while the training loss keeps falling; later checkpoints
 obtain a *lower* FID, but `scripts/checkpoint_curve.py` shows they do so by reproducing training
 slices. The curve scores every saved checkpoint with the same 2,000 conditioning masks and seeds:
-FID/KID against the real validation slices and the nearest-training-slice distance of the samples,
-summarised as the fraction of samples that lie closer to a training slice than 95 % of real
-held-out slices do (≈ 0.05 for a model that generalises). `docs/figures/<run>_checkpoint_curve.png`
+FID/KID against the real validation slices and the nearest-training-slice distance of the samples
+(training slices in both orientations), summarised as the fraction of samples that lie closer to a
+training slice than 95 % of real held-out slices do (≈ 0.05 for a model that generalises). `docs/figures/<run>_checkpoint_curve.png`
 plots loss, FID and that fraction against the epoch; the numbers are in `<run>/checkpoint_curve.json`.
 The dropout-0.1 ablation tests whether regularisation postpones the memorisation and improves the
 early-stopped model.
@@ -84,8 +84,11 @@ below. Against all 4,623 real test slices:
   (torch-fidelity). Reference floor: FID/KID between real *val* and real *test* slices.
 * **VAE ceiling**: PSNR / SSIM / LPIPS of `decode(encode(x))` on real test slices.
 * **Diversity**: mean SSIM over 2,000 random sample pairs (real test slices as reference).
-* **Memorisation**: L2 distance (64×64 grey features) from each sample to its nearest training
-  slice, compared with the same statistic for real test slices; plus a figure of the closest pairs.
+* **Memorisation**: L2 distance (64×64 features) from each sample to its nearest training slice,
+  where the training set is taken in both orientations (a copy of a mirrored training slice is a
+  copy; the models train with flips), compared with the same statistic for real test slices;
+  "memorised" = fraction of samples closer to a training slice than 95 % of real held-out slices
+  are; plus a figure of the closest pairs.
 
 ## Downstream segmentation (`scripts/train_seg.py`)
 

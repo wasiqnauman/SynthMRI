@@ -3,9 +3,11 @@
 * ``pairwise_ssim_diversity``: mean SSIM over random pairs of generated images (lower = more
   diverse; a collapsed model gives values near 1).
 * ``nearest_neighbour_distances``: L2 distance from each generated image to its closest
-  training image. Compared against the same statistic for *real held-out* slices, this tells
-  whether the generator merely copies training slices: if generated samples are, on average,
-  no closer to the training set than unseen real slices are, memorisation is not indicated.
+  training image, where by default the training set is taken in both orientations (a sample that
+  copies a horizontally flipped training slice is a copy too, and the models are trained with
+  flips). Compared against the same statistic for *real held-out* slices, this tells whether the
+  generator merely copies training slices: if generated samples are, on average, no closer to the
+  training set than unseen real slices are, memorisation is not indicated.
 """
 
 from __future__ import annotations
@@ -45,21 +47,28 @@ def pairwise_ssim_diversity(images, n_pairs: int = 2000, seed: int = 0, device="
     return {"pairwise_ssim_mean": float(v.mean()), "pairwise_ssim_std": float(v.std()), "n_pairs": n_pairs}
 
 
-def _features(x: torch.Tensor, size: int) -> torch.Tensor:
-    """Downsample to (size,size), flatten, L2-normalise per image (cosine-like distance)."""
+def _features(x: torch.Tensor, size: int, include_flips: bool = False) -> torch.Tensor:
+    """Downsample to (size,size) and flatten; with ``include_flips`` the horizontally flipped images
+    are appended as rows ``N..2N-1``."""
     if x.shape[-1] != size:
         x = F.interpolate(x, size=(size, size), mode="area")
+    if include_flips:
+        x = torch.cat([x, x.flip(-1)])
     f = x.flatten(1)
     return f
 
 
 @torch.no_grad()
-def nearest_neighbour_distances(query, reference, device="cuda", feat_size: int = 64, chunk: int = 512) -> tuple[np.ndarray, np.ndarray]:
-    """For each query image, the L2 distance to and index of its nearest reference image."""
+def nearest_neighbour_distances(
+    query, reference, device="cuda", feat_size: int = 64, chunk: int = 512, include_flips: bool = True,
+) -> tuple[np.ndarray, np.ndarray]:
+    """For each query image, the L2 distance to and index of its nearest reference image. With
+    ``include_flips`` (default) the reference also contains every image mirrored left-right; an index
+    ``i >= N`` then means "reference image ``i - N``, flipped"."""
     # float32 throughout: a half-precision matmul loses ~0.1 in |x|^2 terms of order 10^3, which is
     # enough to turn an exact match into a spurious non-zero distance.
     q = _features(_to_tensor(query), feat_size).to(device).float()
-    r = _features(_to_tensor(reference), feat_size).to(device).float()
+    r = _features(_to_tensor(reference), feat_size, include_flips).to(device).float()
     r_sq = (r**2).sum(1)
     dists, idxs = [], []
     for s in range(0, q.shape[0], chunk):
@@ -74,12 +83,14 @@ def nearest_neighbour_distances(query, reference, device="cuda", feat_size: int 
     return torch.cat(dists).numpy(), torch.cat(idxs).numpy()
 
 
-def memorisation_report(fake, train, real_test, device="cuda", feat_size: int = 64) -> dict:
-    """NN-distance statistics for generated and real held-out images against the training set."""
-    d_fake, i_fake = nearest_neighbour_distances(fake, train, device, feat_size)
-    d_test, _ = nearest_neighbour_distances(real_test, train, device, feat_size)
+def memorisation_report(fake, train, real_test, device="cuda", feat_size: int = 64, include_flips: bool = True) -> dict:
+    """NN-distance statistics for generated and real held-out images against the training set
+    (both orientations by default)."""
+    d_fake, i_fake = nearest_neighbour_distances(fake, train, device, feat_size, include_flips=include_flips)
+    d_test, _ = nearest_neighbour_distances(real_test, train, device, feat_size, include_flips=include_flips)
     thr = float(np.percentile(d_test, 5))
     return {
+        "reference": "train+hflip" if include_flips else "train",
         "fake_to_train_nn_dist": {"mean": float(d_fake.mean()), "std": float(d_fake.std()), "min": float(d_fake.min()), "p5": float(np.percentile(d_fake, 5))},
         "test_to_train_nn_dist": {"mean": float(d_test.mean()), "std": float(d_test.std()), "min": float(d_test.min()), "p5": thr},
         "frac_fake_closer_than_test_p5": float((d_fake < thr).mean()),
@@ -88,11 +99,15 @@ def memorisation_report(fake, train, real_test, device="cuda", feat_size: int = 
 
 
 def save_nearest_neighbour_figure(fake, train, nn_idx: np.ndarray, path: str | Path, n: int = 8, dists: np.ndarray | None = None) -> None:
-    """Rows: generated image (left) next to its nearest training image (right); closest first."""
-    fake, train = _to_tensor(fake), _to_tensor(train)
+    """Rows: generated image (left) next to its nearest training image (right); closest first.
+    Indices ``>= len(train)`` denote flipped training images (see ``nearest_neighbour_distances``)."""
+    fake = _to_tensor(fake)
+    n_train = len(train)
     order = np.argsort(dists)[:n] if dists is not None else np.arange(min(n, fake.shape[0]))
     panels = []
     for k in order:
+        i = int(nn_idx[k])
+        ref = _to_tensor(np.asarray(train[i % n_train])[None])[0]
         panels.append(fake[k])
-        panels.append(train[int(nn_idx[k])])
+        panels.append(ref.flip(-1) if i >= n_train else ref)
     save_png(image_grid(torch.stack(panels), nrow=2), path)

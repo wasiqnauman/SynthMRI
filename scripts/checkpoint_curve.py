@@ -9,7 +9,7 @@ For each of ``best/``, ``final/``, ``checkpoints/epoch_*`` and ``checkpoints_kee
     mask-conditioned models, masks drawn from ``--mask_source`` with random flips),
   * FID / KID of the composite RGB image against all real validation slices,
   * nearest-training-slice L2 distance (64x64 grey) of the samples, compared with the same statistic
-    for real validation slices: ``frac_closer_than_val_p5`` is the fraction of samples that lie closer
+    for real validation slices (training slices in both orientations): ``frac_closer_than_val_p5`` is the fraction of samples that lie closer
     to a training slice than 95 % of real held-out slices do (~0.05 for a model that generalises).
 Rows are cached in ``<run>/checkpoint_curve/<tag>.json`` (delete to recompute) and merged with the
 per-epoch losses from ``metrics.csv`` into ``<run>/checkpoint_curve.json``.
@@ -35,6 +35,8 @@ from synthmri.eval.diversity import memorisation_report
 from synthmri.eval.fidelity import compute_fid_kid, export_pngs
 from synthmri.models.vae import load_vae
 from synthmri.utils.io import git_commit_hash, save_json
+
+NN_REFERENCE = "train+hflip"  # cached rows computed against another reference are recomputed
 
 
 def checkpoint_epoch(ckpt_dir: Path) -> int | None:
@@ -109,7 +111,7 @@ def main() -> None:
         if args.only and tag not in args.only:
             continue
         row_path = cache / f"{tag}.json"
-        if row_path.exists():
+        if row_path.exists() and json.loads(row_path.read_text()).get("memorisation", {}).get("reference") == NN_REFERENCE:
             continue
         t0 = time.time()
         _, unet, unet_dir = load_run(ckpt, use_ema=True, device=device)
@@ -133,8 +135,8 @@ def main() -> None:
                 shutil.rmtree(fake_png, ignore_errors=True)
         mem = memorisation_report(imgs, train_arr, val_arr, device=str(device))
         mem.pop("nn_index", None)
-        row["memorisation"] = {"fake_to_train_nn_dist": mem["fake_to_train_nn_dist"], "val_to_train_nn_dist": mem["test_to_train_nn_dist"],
-                               "frac_closer_than_val_p5": mem["frac_fake_closer_than_test_p5"]}
+        row["memorisation"] = {"reference": mem["reference"], "fake_to_train_nn_dist": mem["fake_to_train_nn_dist"],
+                               "val_to_train_nn_dist": mem["test_to_train_nn_dist"], "frac_closer_than_val_p5": mem["frac_fake_closer_than_test_p5"]}
         row["seconds"] = time.time() - t0
         row["git_commit"] = git_commit_hash()
         save_json(row, row_path)
