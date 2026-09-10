@@ -14,9 +14,14 @@ memory-maps the synthetic pool (7.4 GB at 256 px) and reads only the selected ro
 `run_experiments.sh` gets `SEG_DIR`; `collect_results.py` / `make_figures.py` produce one
 segmentation block / figure per `runs/seg*` directory.
 
+The main queue finished 10:59 (256 px checkpoint curve: FID(val) 15.10 / memorised 0.033 at the best
+epoch 71; 12.94 / 0.291 at epoch 200 — the regularised model also starts copying late). First
+draft of `docs/RESULTS.md` written from the finished runs, with the secondary analyses and the
+256 px study marked pending.
+
 Files: scripts/checkpoint_curve.py, scripts/train_seg.py, scripts/run_experiments.sh, scripts/collect_results.py,
-scripts/make_figures.py, scripts/queue_2026-09-10b.sh, docs/EXPERIMENTS.md, docs/REPRODUCE.md
-Follow-ups: docs/RESULTS.md once seg2 and seg256 finish
+scripts/make_figures.py, scripts/queue_2026-09-10b.sh, docs/EXPERIMENTS.md, docs/REPRODUCE.md, docs/RESULTS.md
+Follow-ups: fill RESULTS.md sections 5 and 6 once seg2 and seg256 finish
 
 ## 2026-09-10 -- Primary segmentation study complete (3 seeds): synthetic slices help WT at 10 % real, hurt TC / ET everywhere
 

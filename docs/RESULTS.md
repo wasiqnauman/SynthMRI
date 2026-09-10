@@ -1,0 +1,162 @@
+# Results
+
+Every number below is copied from [results_tables.md](results_tables.md) / `results/summary.json`,
+which `scripts/collect_results.py` regenerates from the run directories under `runs/`
+(protocol: [EXPERIMENTS.md](EXPERIMENTS.md); data: [DATA.md](DATA.md)). Generation metrics use the
+`best/` weights (lowest validation diffusion loss, EMA) and 5,000 DDIM-50 samples unless stated;
+segmentation Dice is per-patient on the 74 held-out test patients, mean ± std over 3 seeds.
+
+Status (2026-09-10 11:10): the diffusion models, the checkpoint curves, the model selection and the
+primary 128 px segmentation study are complete. Two pre-declared follow-ups are still running and
+their sections are marked *pending*: the secondary segmentation analyses (`runs/seg/*_{synth1x,vae,pre}_*`,
+started 11:00, ≈ 4 h) and the repeat of the segmentation study at 256 px (`runs/seg256/`, ≈ 12 h after that).
+
+## Headline findings
+
+1. **Without regularisation the latent diffusion model memorises.** LDM-128-mask reaches its lowest
+   validation loss at epoch 34; by epoch 200 its FID against real validation slices has improved from
+   29.9 to 21.8, but 97 % of its samples then lie closer to a training slice (either orientation)
+   than 95 % of real held-out slices do. The "better" late checkpoints are copies.
+2. **Cached affine augmentation, not dropout, fixes this.** With dropout 0.1 + 6 augmented latent
+   variants per slice (LDM-128-mask-reg) the validation loss keeps falling to epoch 101, the
+   memorised fraction at the last epoch is 0.115 instead of 0.966, and the early-stopped model is
+   the best of the three candidates on validation data (FID 24.7 vs 28.8 / 29.9). Dropout alone
+   changes nothing (0.891 memorised at epoch 200). The selection was made on validation slices only.
+3. **At 256 px the regularised model is near the resolution's floor.** LDM-256-mask-reg: FID 10.45
+   vs the real test slices, where two disjoint sets of *real* slices (val vs test) score 9.55;
+   memorised 0.030; 10.83 with tumour masks of patients it never saw.
+4. **Synthetic slices did not improve the 128 px tumour segmenter.** Adding patient-matched synthetic
+   pairs raises whole-tumour Dice slightly at 10 % real data (0.801 → 0.809) but lowers tumour-core
+   and enhancing-tumour Dice at every data fraction (ET at 10 %: 0.509 → 0.430; mean Dice at 100 %:
+   0.778 → 0.757). A segmenter trained on synthetic data alone reaches 0.660 mean Dice, about the
+   level of 10 % real data. Real-trained segmenters recover the conditioning mask in the synthetic
+   images with ET Dice ≈ 0.49, so the generated enhancing-tumour appearance is the weak link.
+
+## 1. Memorisation vs training length (checkpoint curves)
+
+2,000 samples per saved checkpoint, fixed masks and seeds; FID against the real *validation*
+slices; "memorised" = fraction of samples closer to a training slice (both orientations) than 95 %
+of real held-out slices are. Figures: `figures/<run>_checkpoint_curve.png`
+(loss / FID / memorised fraction per epoch).
+
+| run | best epoch (val loss) | FID val at best | memorised at best | FID val at epoch 200 | memorised at epoch 200 |
+|---|---|---|---|---|---|
+| LDM-128-mask (baseline) | 34 | 29.89 | 0.086 | 21.81 | **0.966** |
+| LDM-128-mask-do0.1 | 41 | 28.82 | 0.093 | 21.99 | **0.891** |
+| LDM-128-mask-reg | 101 | 24.65 | 0.049 | 24.43 | 0.115 |
+| LDM-128-reg (unconditional) | 116 | 24.81 | 0.040 | 23.20 | 0.051 |
+| LDM-256-mask-reg | 71 | 15.10 | 0.033 | 12.94 | 0.291 |
+
+The FID-vs-epoch curve alone would favour the last checkpoint of every run; the nearest-neighbour
+check shows that the FID gain after the validation-loss minimum is bought with copies. Reporting
+from the best-validation-loss checkpoint is therefore the protocol for everything below. Even the
+regularised 256 px model starts copying after epoch ≈ 90 (0.074 at epoch 100, 0.291 at epoch 200),
+so early stopping stays necessary; augmentation postpones memorisation, it does not remove it.
+
+## 2. Regularisation ablation and model selection (validation data only)
+
+Rule fixed before the runs finished: lowest FID against validation slices at the best-val-loss
+checkpoint, among candidates with memorised ≤ 0.15 (`results/model_selection.json`).
+
+| candidate | best epoch | FID val ↓ | KID val ×10³ ↓ | memorised ↓ |
+|---|---|---|---|---|
+| baseline (flips only) | 34 | 29.89 | 18.18 | 0.086 |
+| + dropout 0.1 | 41 | 28.82 | 17.24 | 0.093 |
+| + dropout 0.1 + affine augmentation **(chosen)** | 101 | **24.65** | **12.86** | **0.049** |
+
+The chosen recipe was then reused unchanged for the unconditional (LDM-128-reg) and the 256 px
+(LDM-256-mask-reg) models, and its 20,000-sample pool feeds the segmentation study.
+
+## 3. Generation quality on the test set
+
+Against all 4,623 real test slices. `cfg` = classifier-free guidance scale; `val masks` = samples
+conditioned on masks of validation patients (tumour shapes never seen in training). Reference
+floor: FID between real validation and real test slices = 10.49 (128 px) / 9.55 (256 px).
+Pair-SSIM is the mean SSIM of 2,000 random sample pairs (lower = more diverse; real test slices
+0.652 / 0.690). Side-by-side sheets: `figures/<run>_<samples>_real_vs_synth.png`.
+
+| model | setting | FID rgb ↓ | KID ×10³ ↓ | FID flair / t1ce / t2 | pair-SSIM | memorised ↓ |
+|---|---|---|---|---|---|---|
+| LDM-128-mask (baseline) | cfg 2 | 26.22 | 20.89 | 45.9 / 45.4 / 73.0 | 0.576 | 0.069 |
+| LDM-128-mask-do0.1 | cfg 2 | 24.34 | 19.13 | 47.7 / 46.2 / 75.7 | 0.585 | 0.070 |
+| LDM-128-mask-reg | cfg 2 | 20.85 | 15.19 | 44.3 / 44.0 / 69.6 | 0.584 | 0.043 |
+| LDM-128-mask-reg | cfg 1 | 20.37 | 14.74 | 47.0 / 44.2 / 69.4 | 0.586 | 0.036 |
+| LDM-128-mask-reg | cfg 2, val masks | 22.85 | 16.52 | 45.2 / 44.1 / 71.1 | 0.593 | 0.040 |
+| LDM-128-reg (unconditional) | cfg 1 | 21.31 | 15.87 | 47.5 / 45.0 / 68.7 | 0.579 | 0.027 |
+| LDM-256-mask-reg | cfg 2 | **10.45** | **6.40** | 40.3 / 39.6 / 59.1 | 0.628 | 0.030 |
+| LDM-256-mask-reg | cfg 1 | 12.83 | 8.77 | 43.1 / 41.7 / 58.2 | 0.637 | 0.021 |
+| LDM-256-mask-reg | cfg 2, val masks | 10.83 | 6.17 | 40.4 / 39.3 / 60.7 | 0.633 | 0.024 |
+
+Observations: (i) the regularised recipe improves test FID by 5.4 points over the baseline at the
+same resolution; (ii) unseen validation masks cost 2.0 FID points at 128 px and 0.4 at 256 px, so
+the models generalise to new tumour geometry; (iii) guidance 2 helps at 256 px (10.45 vs 12.83) and is slightly worse than
+guidance 1 at 128 px (20.85 vs 20.37); (iv) per-modality FIDs are far above the composite because each grey channel is replicated
+to RGB for Inception, and T2 is consistently the hardest modality; (v) all memorised fractions sit at
+or below the 0.05 expected for a model that generalises; (vi) the mask-conditioned and unconditional
+128 px models score alike, so conditioning costs no fidelity.
+
+**VAE ceiling** (`decode(encode(x))` on real test slices, frozen `sd-vae-ft-mse`): PSNR 26.4 dB /
+SSIM 0.833 / LPIPS 0.041 at 128 px and 29.0 dB / 0.877 / 0.036 at 256 px (T2 is the worst channel at
+both). No latent model can be sharper than this; part of the fine-detail loss discussed below is the
+autoencoder's, not the diffusion model's.
+
+## 4. Downstream segmentation at 128 px (primary protocol)
+
+2-D U-Net, 40 epochs, model selection on real validation patients, per-patient Dice on the 74 test
+patients, 3 seeds. Synthetic slices come from LDM-128-mask-reg (`best/`, cfg 2) and are
+patient-matched: a real-x % segmenter only receives synthetic slices conditioned on masks of its
+own x % patients. Figure: `figures/segmentation_dice.png`.
+
+| training data | real patients | real slices | synthetic slices | WT | TC | ET | mean |
+|---|---|---|---|---|---|---|---|
+| 10 % real | 26 | 1,483–1,705 | 0 | 0.801 ± 0.011 | 0.580 ± 0.023 | 0.509 ± 0.022 | 0.630 ± 0.016 |
+| 10 % real + synthetic | 26 | 1,483–1,705 | 1,845–2,208 | 0.809 ± 0.006 | 0.559 ± 0.010 | 0.430 ± 0.033 | 0.600 ± 0.014 |
+| 25 % real | 64 | 3,937–4,031 | 0 | 0.847 ± 0.003 | 0.676 ± 0.011 | 0.611 ± 0.010 | 0.711 ± 0.004 |
+| 25 % real + synthetic | 64 | 3,937–4,031 | 4,913–5,158 | 0.844 ± 0.004 | 0.660 ± 0.021 | 0.521 ± 0.014 | 0.675 ± 0.012 |
+| 100 % real | 258 | 15,895 | 0 | 0.886 ± 0.001 | 0.775 ± 0.005 | 0.673 ± 0.004 | 0.778 ± 0.003 |
+| 100 % real + synthetic | 258 | 15,895 | 20,000 | 0.879 ± 0.001 | 0.742 ± 0.009 | 0.650 ± 0.010 | 0.757 ± 0.006 |
+| synthetic only | 0 | 0 | 20,000 | 0.829 ± 0.002 | 0.669 ± 0.007 | 0.481 ± 0.012 | 0.660 ± 0.005 |
+
+**Mask consistency** (per-slice Dice between a real-trained segmenter's prediction on a synthetic
+image and the mask it was conditioned on, all 20,000 pairs):
+
+| segmenter trained on | WT | TC | ET |
+|---|---|---|---|
+| 10 % real | 0.767 ± 0.006 | 0.506 ± 0.023 | 0.439 ± 0.025 |
+| 25 % real | 0.783 ± 0.003 | 0.566 ± 0.006 | 0.493 ± 0.012 |
+| 100 % real | 0.789 ± 0.002 | 0.584 ± 0.006 | 0.494 ± 0.004 |
+
+Reading: the synthetic pairs carry the whole-tumour outline well (WT consistency 0.79 vs a real
+test Dice of 0.89 for the same segmenter) but the enhancing-tumour appearance inside the mask
+matches the label only about half the time. Mixing such pairs into training teaches the segmenter
+a blurred ET/TC appearance, which is why the loss is largest on ET and shows up even with 100 %
+real data. Synthetic-only training reaching 0.660 confirms that the pairs are label-consistent
+enough to be usable, but not sharper than what 26 real patients provide.
+
+## 5. Secondary segmentation analyses (*pending*)
+
+Declared in [EXPERIMENTS.md](EXPERIMENTS.md) after the first seed-0 results; running since
+2026-09-10 11:00 (`runs/seg/real<pct>_{synth1x,vae,pre}_s<seed>`, 27 U-Nets). They ask whether
+the loss comes from the 1.25:1 synthetic ratio (→ 1:1), whether pre-training on synthetic then
+fine-tuning on real helps where mixing does not, and how much of the gap is the frozen VAE's own
+blur (real slices replaced by their VAE reconstruction). Table and
+`figures/segmentation_dice_secondary.png` will be added when `collect_results.py` runs at the end
+of the queue.
+
+## 6. Segmentation study at 256 px (*pending*)
+
+Same protocol with the 256 px data and the LDM-256-mask-reg pool (`runs/seg256/`), declared before
+any 256 px segmenter was trained; queued after the secondary analyses (≈ 12 h). It tests whether
+the near-floor 256 px generator, with a higher VAE ceiling, changes the conclusion of section 4.
+
+## Limitations
+
+* 2-D slices only; no inter-slice consistency, and Dice is aggregated per patient over 2-D slices
+  rather than computed on volumes.
+* Inception features (natural images) for FID/KID; the real val-vs-test floor is reported to
+  calibrate them, but a radiology-specific extractor would be more sensitive to clinically
+  relevant detail.
+* The VAE is frozen (`sd-vae-ft-mse`, trained on natural images); its ceiling bounds every model.
+* One dataset (BraTS 2020, 369 patients, one split); the segmentation conclusions have 3 seeds
+  but no external test cohort.
+* Compute per model: 1.5 h (128 px) / 2.8 h (256 px) on one RTX A6000; 200 epochs each.
