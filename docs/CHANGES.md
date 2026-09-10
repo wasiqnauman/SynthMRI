@@ -1,5 +1,18 @@
 # Work log
 
+## 2026-09-10 -- Primary segmentation study complete (3 seeds): synthetic slices help WT at 10 % real, hurt TC / ET everywhere
+
+21 segmenters finished (`runs/seg/`, selected model `ldm128_maskcond_reg`, patient-matched synthetic
+pool). Mean per-patient test Dice (WT / TC / ET, 3 seeds): 10 % real 0.801 / 0.580 / 0.509 → with
+synthetic 0.809 / 0.559 / 0.430; 25 % real 0.847 / 0.676 / 0.611 → 0.844 / 0.660 / 0.521; 100 % real
+0.886 / 0.775 / 0.673 → 0.879 / 0.742 / 0.650; synthetic only 0.829 / 0.669 / 0.481 (≈ the 10 %-real
+level). Mask consistency of the synthetic pool under a 100 %-real segmenter: WT 0.789, TC 0.584,
+ET 0.494 per slice. Reported as is; the pre-declared secondary analyses (previous entry) run next.
+Tables in `docs/results_tables.md`, `results/summary.json`; figure `docs/figures/segmentation_dice.png`.
+
+Files: docs/results_tables.md, results/summary.json
+Follow-ups: docs/RESULTS.md after the uncond / 256 px models and the seg2 queue
+
 ## 2026-09-10 -- Secondary segmentation analyses declared and queued (1:1 synthetic, synthetic pre-training, VAE-reconstructed real)
 
 The first real + synthetic segmenters (seed 0, 10 % and 25 % real) score *below* real only on TC and
