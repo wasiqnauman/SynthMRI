@@ -32,16 +32,17 @@ BraTS 2020 3-D volumes ──preprocess──▶ 2-D tumour slices (patient-leve
   (real slices passed through it lose 0.06–0.07 mean Dice), so the decoder's blur is the bottleneck.
   At 256 px, where the VAE ceiling is 2.6 dB higher, synthetic data *helps* with 26 real patients
   (+0.027 mean Dice, all regions, 3/3 seeds) and is neutral with more. Used for pre-training instead,
-  synthetic data helps at 128 px too (+0.044 at 10 % real; compute-matched control running).
+  synthetic data helps at 128 px too: +0.021 at 10 % real and +0.014 at 25 % over a control given
+  the same extra epochs on real data.
 
 | ![checkpoint curve](docs/figures/ldm128_maskcond_checkpoint_curve.png) | ![256 px segmentation](docs/figures/segmentation_dice_seg256.png) |
 |---|---|
 | baseline: validation loss, FID and copied fraction per epoch | 256 px: Dice with and without synthetic slices |
 
 **Status.** Complete: all diffusion models, checkpoint curves, model selection, 128 px and 256 px
-segmentation studies, secondary analyses. Running (queued back to back, see
-[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) for the pre-declared protocols): the compute-matched
-pre-training control and the VAE-decoder fine-tune study. A PDF of the results with all figures is
+segmentation studies, secondary analyses and the compute-matched pre-training control. Running (see
+[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) for the pre-declared protocol): the VAE-decoder fine-tune
+study. A PDF of the results with all figures is
 [docs/SynthMRI_results.pdf](docs/SynthMRI_results.pdf) (`python scripts/make_report.py`).
 
 ## Setup

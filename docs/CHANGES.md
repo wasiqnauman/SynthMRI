@@ -1,5 +1,15 @@
 # Work log
 
+## 2026-09-10 -- Pre-training control complete (3 seeds)
+
+`seg3` finished 19:18 (9 U-Nets). A segmenter given the same 20 extra epochs on real data reaches
+0.653 / 0.712 / 0.782 mean Dice (10 / 25 / 100 % real) vs 0.674 / 0.726 / 0.779 for synthetic
+pre-training, so the synthetic-specific gain is +0.021 / +0.014 / −0.003 (raw gains over real only
+were +0.044 / +0.015 / +0.001). RESULTS.md section 8, finding 6 and the README updated; PDF rebuilt.
+
+Files: docs/RESULTS.md, README.md, docs/results_tables.md, results/summary.json, docs/figures/segmentation_dice_secondary.png, docs/SynthMRI_results.pdf
+Follow-ups: section 7 of RESULTS.md when the decoder study finishes (~2026-09-11 06:00)
+
 ## 2026-09-10 -- Results PDF, README results-at-a-glance, figures embedded in RESULTS.md
 
 `scripts/make_report.py` renders `docs/RESULTS.md` (+ `docs/results_tables.md` as an appendix) to

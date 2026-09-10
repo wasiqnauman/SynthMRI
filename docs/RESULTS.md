@@ -6,11 +6,10 @@ which `scripts/collect_results.py` regenerates from the run directories under `r
 `best/` weights (lowest validation diffusion loss, EMA) and 5,000 DDIM-50 samples unless stated;
 segmentation Dice is per-patient on the 74 held-out test patients, mean ± std over 3 seeds.
 
-Status (2026-09-10 18:40): the diffusion models, the checkpoint curves, the model selection, the
-128 px segmentation study with its secondary analyses, and the 256 px segmentation study are
-complete. Two pre-declared follow-ups are queued back to back and their sections are marked
-*pending*: the compute-matched pre-training control (section 8, running) and the VAE decoder
-fine-tune study (section 7).
+Status (2026-09-10 19:25): the diffusion models, the checkpoint curves, the model selection, the
+128 px segmentation study with its secondary analyses and the pre-training control, and the 256 px
+segmentation study are complete. One pre-declared follow-up is running and marked *pending*: the
+VAE decoder fine-tune study (section 7, ≈ 10 h).
 
 ## Headline findings
 
@@ -36,8 +35,9 @@ fine-tune study (section 7).
    ET −0.11 to −0.14), and halving the synthetic ratio barely helps. The natural-image decoder
    removes enhancing-tumour detail; every synthetic image inherits that.
 6. **Used as pre-training instead of as extra training data, the synthetic pairs help when real data
-   is scarce**: +0.044 mean Dice at 10 % real (ET 0.509 → 0.564), +0.015 at 25 %, nothing at 100 %,
-   subject to the compute-matched control that is still running.
+   is scarce, even against a compute-matched control**: +0.021 mean Dice at 10 % real and +0.014 at
+   25 % over a segmenter given the same extra epochs on real data (raw gains over real only: +0.044
+   and +0.015); nothing at 100 %.
 7. **At 256 px, where the generator sits at the FID floor and the VAE ceiling is 2.6 dB higher, the
    mixed synthetic data helps in the low-data regime**: +0.027 mean Dice with 26 real patients
    (all regions, 3/3 seeds), neutral with 64 and with all 258. Synthetic-only training reaches the
@@ -191,10 +191,9 @@ Three answers to the questions posed in the declaration:
 * **Pre-training on synthetic pairs, then fine-tuning on real, helps in the low-data regime.**
   +0.044 mean Dice at 10 % real (all three regions, ET 0.509 → 0.564, 3/3 seeds), +0.015 at 25 %,
   nothing at 100 %. Fine-tuning on real slices overrides the blurred appearance that mixing bakes
-  in, while the pre-trained features still transfer. The pre-trained runs receive 20 extra epochs,
-  so a compute-matched control (the same 20 epochs of pre-training on the real slices themselves,
-  `runs/seg/real<pct>_prereal_s<seed>`) is queued; the gain is claimed only if it survives that
-  control (section 8, *pending*).
+  in, while the pre-trained features still transfer. The pre-trained runs receive 20 extra epochs;
+  section 8 shows that a control given the same extra epochs on real data recovers about half of
+  the 10 % gain and none of the 25 % gain, so the synthetic-specific effect is +0.021 / +0.014.
 
 ## 6. Segmentation study at 256 px
 
@@ -233,10 +232,22 @@ again with the new decoder, and the primary + secondary segmentation study is re
 pool (`runs/vae_dec_brats128/`, `runs/seg_ftdec/`). Pre-declared readings are in
 [EXPERIMENTS.md](EXPERIMENTS.md); queued after section 8 (≈ 10 h).
 
-## 8. Compute-matched control for synthetic pre-training (*pending*)
+## 8. Compute-matched control for synthetic pre-training
 
-`runs/seg/real<pct>_prereal_s<seed>`: 20 epochs of pre-training on the real slices themselves, then
-the same fine-tuning; queued after section 6 (≈ 1.5 h).
+The synthetic-pre-training runs of section 5 train for 20 + 40 epochs. `runs/seg/real<pct>_prereal_s<seed>`
+pre-trains for the same 20 epochs on the real slices themselves and then fine-tunes identically
+(same seeds and fractions), so the two differ only in *what* the 20 extra epochs see.
+
+| real patients | real only | + real pre-training (control) | + synthetic pre-training | synthetic − control |
+|---|---|---|---|---|
+| 26 (10 %) | 0.630 ± 0.016 | 0.653 ± 0.010 | 0.674 ± 0.008 | **+0.021** (WT +0.025, TC +0.024, ET +0.015) |
+| 64 (25 %) | 0.711 ± 0.004 | 0.712 ± 0.003 | 0.726 ± 0.005 | **+0.014** (WT +0.009, TC +0.030, ET +0.004) |
+| 258 (100 %) | 0.778 ± 0.003 | 0.782 ± 0.002 | 0.779 ± 0.003 | −0.003 |
+
+About half of the raw +0.044 at 10 % real is the longer schedule (the control gains +0.023 on its
+own); the other half, +0.021, is attributable to the synthetic pairs and exceeds the seed spread of
+both conditions. At 25 % the control gains nothing and synthetic pre-training keeps +0.014. At
+100 % neither helps. The claim in finding 6 is therefore kept at the corrected size.
 
 ## Limitations
 
