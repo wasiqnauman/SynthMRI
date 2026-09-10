@@ -6,11 +6,11 @@ which `scripts/collect_results.py` regenerates from the run directories under `r
 `best/` weights (lowest validation diffusion loss, EMA) and 5,000 DDIM-50 samples unless stated;
 segmentation Dice is per-patient on the 74 held-out test patients, mean ± std over 3 seeds.
 
-Status (2026-09-10 13:45): the diffusion models, the checkpoint curves, the model selection, the
-primary 128 px segmentation study and its secondary analyses are complete. Three pre-declared
-follow-ups are queued back to back and their sections are marked *pending*: the segmentation study
-at 256 px (section 6, running), the compute-matched pre-training control (section 8) and the VAE
-decoder fine-tune study (section 7).
+Status (2026-09-10 18:40): the diffusion models, the checkpoint curves, the model selection, the
+128 px segmentation study with its secondary analyses, and the 256 px segmentation study are
+complete. Two pre-declared follow-ups are queued back to back and their sections are marked
+*pending*: the compute-matched pre-training control (section 8, running) and the VAE decoder
+fine-tune study (section 7).
 
 ## Headline findings
 
@@ -38,6 +38,10 @@ decoder fine-tune study (section 7).
 6. **Used as pre-training instead of as extra training data, the synthetic pairs help when real data
    is scarce**: +0.044 mean Dice at 10 % real (ET 0.509 → 0.564), +0.015 at 25 %, nothing at 100 %,
    subject to the compute-matched control that is still running.
+7. **At 256 px, where the generator sits at the FID floor and the VAE ceiling is 2.6 dB higher, the
+   mixed synthetic data helps in the low-data regime**: +0.027 mean Dice with 26 real patients
+   (all regions, 3/3 seeds), neutral with 64 and with all 258. Synthetic-only training reaches the
+   level of 25 % real data.
 
 ## 1. Memorisation vs training length (checkpoint curves)
 
@@ -182,11 +186,32 @@ Three answers to the questions posed in the declaration:
   `runs/seg/real<pct>_prereal_s<seed>`) is queued; the gain is claimed only if it survives that
   control (section 8, *pending*).
 
-## 6. Segmentation study at 256 px (*pending*)
+## 6. Segmentation study at 256 px
 
-Same protocol with the 256 px data and the LDM-256-mask-reg pool (`runs/seg256/`), declared before
-any 256 px segmenter was trained; running since 2026-09-10 13:38 (≈ 12 h). It tests whether the
-near-floor 256 px generator, with a higher VAE ceiling, changes the conclusion of section 4.
+Same protocol as section 4 (declared before any 256 px segmenter was trained) with the 256 px
+slices and the LDM-256-mask-reg pool (`runs/seg256/`, 21 U-Nets). Figure:
+`figures/segmentation_dice_seg256.png`.
+
+| training data | WT | TC | ET | mean | Δ mean vs real only |
+|---|---|---|---|---|---|
+| 10 % real | 0.849 ± 0.006 | 0.672 ± 0.019 | 0.604 ± 0.009 | 0.709 ± 0.003 | |
+| 10 % real + synthetic | 0.860 ± 0.006 | 0.721 ± 0.007 | 0.626 ± 0.006 | 0.736 ± 0.004 | **+0.027** |
+| 25 % real | 0.874 ± 0.003 | 0.751 ± 0.009 | 0.668 ± 0.010 | 0.764 ± 0.007 | |
+| 25 % real + synthetic | 0.878 ± 0.000 | 0.769 ± 0.004 | 0.654 ± 0.000 | 0.767 ± 0.001 | +0.003 |
+| 100 % real | 0.895 ± 0.000 | 0.810 ± 0.002 | 0.707 ± 0.002 | 0.804 ± 0.000 | |
+| 100 % real + synthetic | 0.894 ± 0.004 | 0.818 ± 0.006 | 0.692 ± 0.008 | 0.801 ± 0.005 | −0.003 |
+| synthetic only | 0.871 ± 0.002 | 0.785 ± 0.008 | 0.623 ± 0.004 | 0.760 ± 0.003 | |
+
+At 256 px the sign flips in the low-data regime: with 26 real patients, adding the patient-matched
+synthetic pairs improves every region (TC +0.049, ET +0.022, WT +0.011; 3/3 seeds, spread ≤ 0.004),
+where the same protocol at 128 px lost 0.030. With 64 patients the effect is neutral (TC up, ET
+down), and with all 258 it is neutral on the mean and still slightly negative on ET (−0.015). The
+synthetic-only segmenter reaches 0.760, the level of 25 % real data (128 px: 0.660, the level of
+10 %). The 256 px pool comes from a generator at the FID floor (10.45 vs 9.55) decoded through a VAE
+whose ceiling is 29.0 dB / SSIM 0.877 instead of 26.4 dB / 0.833, consistent with section 5's
+finding that the decoder's loss of detail, not the diffusion model, was limiting the 128 px result.
+Note that the 256 px real-only segmenters are themselves stronger (0.709 / 0.764 / 0.804 vs
+0.630 / 0.711 / 0.778), so the two resolutions are compared only within themselves.
 
 ## 7. VAE decoder fine-tuning (*pending*)
 

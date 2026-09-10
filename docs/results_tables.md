@@ -79,3 +79,23 @@ Rule: lowest FID vs validation slices at the best-val-loss checkpoint among runs
 | 10% real | 20000 | 0.767 ± 0.006 | 0.506 ± 0.023 | 0.439 ± 0.025 |
 | 25% real | 20000 | 0.783 ± 0.003 | 0.566 ± 0.006 | 0.493 ± 0.012 |
 | 100% real | 20000 | 0.789 ± 0.002 | 0.584 ± 0.006 | 0.494 ± 0.004 |
+
+## Downstream segmentation `seg256` (segmenter config `ldm256_maskcond_reg.yaml`, synthetic pool from `ldm256_maskcond_reg`; per-patient Dice on held-out test patients, mean ± std over seeds; rows after the primary protocol are the secondary analyses of EXPERIMENTS.md)
+
+| training data | real patients | real slices | synthetic slices | seeds | WT | TC | ET | mean |
+|---|---|---|---|---|---|---|---|---|
+| 10% real | 26 | 1483–1705 | 0 | 3 | 0.849 ± 0.006 | 0.672 ± 0.019 | 0.604 ± 0.009 | 0.709 ± 0.003 |
+| 10% real + synthetic | 26 | 1483–1705 | 1845–2208 | 3 | 0.860 ± 0.006 | 0.721 ± 0.007 | 0.626 ± 0.006 | 0.736 ± 0.004 |
+| 25% real | 64 | 3937–4031 | 0 | 3 | 0.874 ± 0.003 | 0.751 ± 0.009 | 0.668 ± 0.010 | 0.764 ± 0.007 |
+| 25% real + synthetic | 64 | 3937–4031 | 4913–5158 | 3 | 0.878 ± 0.000 | 0.769 ± 0.004 | 0.654 ± 0.000 | 0.767 ± 0.001 |
+| 100% real | 258 | 15895 | 0 | 3 | 0.895 ± 0.000 | 0.810 ± 0.002 | 0.707 ± 0.002 | 0.804 ± 0.000 |
+| 100% real + synthetic | 258 | 15895 | 20000 | 3 | 0.894 ± 0.004 | 0.818 ± 0.006 | 0.692 ± 0.008 | 0.801 ± 0.005 |
+| synthetic only | 0 | 0 | 20000 | 3 | 0.871 ± 0.002 | 0.785 ± 0.008 | 0.623 ± 0.004 | 0.760 ± 0.003 |
+
+## Mask consistency of synthetic samples (per-slice Dice of a real-trained segmenter vs the conditioning mask, mean ± std over seeds)
+
+| segmenter | n synthetic | WT | TC | ET |
+|---|---|---|---|---|
+| 10% real | 20000 | 0.848 ± 0.003 | 0.616 ± 0.025 | 0.567 ± 0.042 |
+| 25% real | 20000 | 0.864 ± 0.001 | 0.699 ± 0.014 | 0.665 ± 0.029 |
+| 100% real | 20000 | 0.875 ± 0.000 | 0.756 ± 0.011 | 0.728 ± 0.009 |

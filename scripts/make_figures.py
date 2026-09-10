@@ -158,7 +158,7 @@ def _seg_bars(seg: dict, conditions: list[tuple[str, str]], filename: Path, synt
     """Grouped bars: one group per real-data fraction, one bar per (label, key suffix) condition."""
     fracs = [k for k in ("10% real", "25% real", "100% real") if k in seg]
     conditions = [c for c in conditions if any(f + c[1] in seg for f in fracs)]
-    if not fracs or not conditions:
+    if not fracs or len(conditions) < 2:  # nothing to compare (e.g. a study without secondary conditions)
         return
     regions = ["WT", "TC", "ET"]
     fig, axes = plt.subplots(1, 3, figsize=(8.4, 2.7), dpi=200, sharey=True)

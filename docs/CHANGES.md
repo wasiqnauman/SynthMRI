@@ -1,5 +1,16 @@
 # Work log
 
+## 2026-09-10 -- 256 px segmentation study complete (3 seeds)
+
+`runs/seg256/` finished 18:26 (21 U-Nets, ~4.8 h instead of the estimated 12). Mean Dice vs real
+only: +0.027 at 10 % real (all regions up, 3/3 seeds), +0.003 at 25 %, −0.003 at 100 % (ET −0.015);
+synthetic only 0.760 (= 25 %-real level). At 128 px the same protocol lost 0.030 / 0.036 / 0.021.
+RESULTS.md section 6 written. `make_figures.py` no longer draws a secondary-analysis figure for a
+study that has no secondary conditions (the seg256 one held a single bar series).
+
+Files: docs/RESULTS.md, docs/results_tables.md, results/summary.json, docs/figures/segmentation_dice_seg256.png, scripts/make_figures.py, docs/REPRODUCE.md
+Follow-ups: sections 7–8 of RESULTS.md as the decoder study and the pre-training control finish
+
 ## 2026-09-10 -- Secondary segmentation analyses complete (3 seeds)
 
 `seg2` finished 13:38 (27 U-Nets). Relative to real only, mean Dice: 1:1 mixing −0.020 / −0.024 /
