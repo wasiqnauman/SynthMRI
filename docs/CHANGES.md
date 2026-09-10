@@ -1,5 +1,17 @@
 # Work log
 
+## 2026-09-09 -- Result tables: checkpoint-curve summary, model-selection table, memorised-fraction column
+
+`scripts/collect_results.py` now writes, next to the generative-quality table (which gains the
+fraction of samples closer to a training slice than 95 % of real test slices), a table with the
+best-validation-loss vs last checkpoint of every run that has a checkpoint curve (epoch, validation
+loss, FID/KID vs validation slices, memorised fraction) and the candidate table behind
+`results/model_selection.json`. The `smoke` run is excluded from all tables. Also removed an empty
+`runs/ldm128_maskcond/samples_ddim50_cfg2_seed0/eval/` folder left behind by the old runner.
+
+Files: scripts/collect_results.py
+Follow-ups: none
+
 ## 2026-09-09 -- Regularised recipe (cached affine augmentation + dropout), validation-only model selection, unseen-mask sample sets; `.gitignore` was hiding `synthmri/data/`
 
 The baseline LDM-128-mask memorises training slices after epoch ~34 (previous entry), so two

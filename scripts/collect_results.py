@@ -3,8 +3,9 @@
 
     python scripts/collect_results.py            # writes docs/results_tables.md and results/summary.json
 
-Segmentation runs are grouped by (real fraction, synthetic used, synthetic only) and averaged over
-seeds (mean ± std of the per-patient test Dice).
+Tables: generative quality per sample set, checkpoint curve (best-val-loss vs last checkpoint) and the
+model selection, then the segmentation study, whose runs are grouped by (real fraction, synthetic used,
+synthetic only) and averaged over seeds (mean ± std of the per-patient test Dice).
 """
 
 from __future__ import annotations
@@ -16,6 +17,8 @@ from pathlib import Path
 
 import numpy as np
 
+EXCLUDE = {"smoke"}  # pipeline checks, never results
+
 
 def fmt(m: float, s: float | None = None, nd: int = 3) -> str:
     return f"{m:.{nd}f}" if s is None else f"{m:.{nd}f} ± {s:.{nd}f}"
@@ -23,12 +26,12 @@ def fmt(m: float, s: float | None = None, nd: int = 3) -> str:
 
 def generation_tables(runs_dir: Path) -> tuple[list[str], dict]:
     lines, summary = [], {}
-    rows = sorted(runs_dir.glob("*/samples_*/eval/results.json"))
+    rows = sorted(p for p in runs_dir.glob("*/samples_*/eval/results.json") if p.parents[2].name not in EXCLUDE)
     if not rows:
         return lines, summary
     lines += ["## Generative quality (samples vs real test slices)", "",
-              "| run | samples | FID rgb ↓ | KID rgb ×10³ ↓ | FID flair | FID t1ce | FID t2 | ref FID rgb (val vs test) | pair-SSIM (samples / real) ↓ | NN dist (samples / real test) |",
-              "|---|---|---|---|---|---|---|---|---|---|"]
+              "| run | samples | FID rgb ↓ | KID rgb ×10³ ↓ | FID flair | FID t1ce | FID t2 | ref FID rgb (val vs test) | pair-SSIM (samples / real) ↓ | NN dist (samples / real test) | memorised ↓ |",
+              "|---|---|---|---|---|---|---|---|---|---|---|"]
     for p in rows:
         r = json.loads(p.read_text())
         run, tag = p.parents[2].name, p.parents[1].name
@@ -44,7 +47,8 @@ def generation_tables(runs_dir: Path) -> tuple[list[str], dict]:
             f"| {run} | {tag} | {g('rgb'):.2f} | {1000 * g('rgb', 'kid_mean'):.2f} | {g('flair'):.2f} | {g('t1ce'):.2f} | {g('t2'):.2f} | "
             f"{ref.get('rgb', {}).get('fid', float('nan')):.2f} | "
             f"{d.get('samples', {}).get('pairwise_ssim_mean', float('nan')):.3f} / {d.get('real_test', {}).get('pairwise_ssim_mean', float('nan')):.3f} | "
-            f"{m.get('fake_to_train_nn_dist', {}).get('mean', float('nan')):.2f} / {m.get('test_to_train_nn_dist', {}).get('mean', float('nan')):.2f} |"
+            f"{m.get('fake_to_train_nn_dist', {}).get('mean', float('nan')):.2f} / {m.get('test_to_train_nn_dist', {}).get('mean', float('nan')):.2f} | "
+            f"{m.get('frac_fake_closer_than_test_p5', float('nan')):.3f} |"
         )
         summary[f"{run}/{tag}"] = {k: v for k, v in r.items() if k not in ("memorisation",)} | {"memorisation": {k: v for k, v in m.items() if k != "nn_index"}}
     lines.append("")
@@ -61,6 +65,49 @@ def generation_tables(runs_dir: Path) -> tuple[list[str], dict]:
             vae_lines.append(f"| {p.parents[2].name} | {k} | {fmt(mm['psnr']['mean'], mm['psnr']['std'], 2)} | {fmt(mm['ssim']['mean'], mm['ssim']['std'])} | {lp:.3f} |")
     if len(vae_lines) > 4:
         lines += vae_lines + [""]
+    return lines, summary
+
+
+def checkpoint_tables(runs_dir: Path, selection_json: Path) -> tuple[list[str], dict]:
+    """Best-validation-loss vs last checkpoint of every run with a checkpoint curve, plus the model selection."""
+    files = sorted(f for f in runs_dir.glob("*/checkpoint_curve.json") if f.parent.name not in EXCLUDE)
+    lines, summary = [], {}
+    if files:
+        lines += ["## Checkpoint curve: best-validation-loss vs last checkpoint (2,000 samples each; FID/KID vs real validation slices; "
+                  "memorised = fraction of samples closer to a training slice than 95 % of real held-out slices)", "",
+                  "| run | best epoch | val loss | FID val ↓ | KID val ×10³ ↓ | memorised ↓ | last epoch | FID val | memorised |",
+                  "|---|---|---|---|---|---|---|---|---|"]
+        for f in files:
+            d = json.loads(f.read_text())
+            run = f.parent.name
+            rows = [r for r in d["checkpoints"] if r.get("epoch") is not None and "fid_val" in r]
+            if not rows:
+                continue
+            best = next((r for r in rows if r["tag"] == "best"), None)
+            last = max(rows, key=lambda r: r["epoch"])
+            losses = {l_["epoch"]: l_ for l_ in d.get("losses", [])}
+
+            def cell(r) -> str:
+                return f"{r['fid_val']['fid']:.2f} | {1000 * r['fid_val']['kid_mean']:.2f} | {r['memorisation']['frac_closer_than_val_p5']:.3f}"
+
+            if best is not None:
+                vl = losses.get(best["epoch"], {}).get("val_loss", float("nan"))
+                lines.append(f"| {run} | {best['epoch']} | {vl:.4f} | {cell(best)} | {last['epoch']} | {last['fid_val']['fid']:.2f} | "
+                             f"{last['memorisation']['frac_closer_than_val_p5']:.3f} |")
+            summary[run] = {"best_epoch": d.get("best_epoch"), "checkpoints": [
+                {"tag": r["tag"], "epoch": r["epoch"], "fid_val": r["fid_val"]["fid"], "kid_val": r["fid_val"]["kid_mean"],
+                 "frac_memorised": r["memorisation"]["frac_closer_than_val_p5"],
+                 "nn_dist_mean": r["memorisation"]["fake_to_train_nn_dist"]["mean"]} for r in sorted(rows, key=lambda r: r["epoch"])]}
+        lines.append("")
+    if selection_json.exists():
+        sel = json.loads(selection_json.read_text())
+        lines += [f"## Model selection (validation data only): **{sel['chosen']}**", "", f"Rule: {sel['rule']}.", "",
+                  "| candidate | best epoch | FID val ↓ | KID val ×10³ ↓ | memorised ↓ |", "|---|---|---|---|---|"]
+        for c in sel["candidates"]:
+            mark = " **(chosen)**" if c["run"] == sel["chosen"] else ""
+            lines.append(f"| {c['run']}{mark} | {c['best_epoch']} | {c['fid_val']:.2f} | {1000 * c['kid_val']:.2f} | {c['frac_memorised']:.3f} |")
+        lines.append("")
+        summary["model_selection"] = sel
     return lines, summary
 
 
@@ -114,15 +161,17 @@ def main() -> None:
     p.add_argument("--runs", default="runs")
     p.add_argument("--out_md", default="docs/results_tables.md")
     p.add_argument("--out_json", default="results/summary.json")
+    p.add_argument("--selection", default="results/model_selection.json")
     args = p.parse_args()
     runs = Path(args.runs)
     g_lines, g_sum = generation_tables(runs)
+    c_lines, c_sum = checkpoint_tables(runs, Path(args.selection))
     s_lines, s_sum = segmentation_tables(runs)
-    md = ["# Result tables (auto-generated by scripts/collect_results.py)", ""] + g_lines + s_lines
+    md = ["# Result tables (auto-generated by scripts/collect_results.py)", ""] + g_lines + c_lines + s_lines
     Path(args.out_md).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out_md).write_text("\n".join(md))
     Path(args.out_json).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out_json).write_text(json.dumps({"generation": g_sum, "segmentation": s_sum}, indent=2))
+    Path(args.out_json).write_text(json.dumps({"generation": g_sum, "checkpoints": c_sum, "segmentation": s_sum}, indent=2))
     print("\n".join(md))
     print(f"\nwrote {args.out_md} and {args.out_json}")
 
