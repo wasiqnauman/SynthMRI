@@ -93,3 +93,39 @@ def test_slice_dataset(processed_dir):
             assert torch.equal(it["image"], raw) and torch.equal(it["mask"], item["mask"])
     assert 0 < flips < 20
     assert len(ds.patient_ids) == len(ds)
+
+
+def test_affine_augmentation():
+    from synthmri.data.augment import (
+        HFLIP,
+        IDENTITY,
+        apply_affine,
+        apply_affine_image,
+        is_hflip,
+        is_identity,
+        sample_affine_params,
+        transform_mask,
+    )
+
+    torch.manual_seed(0)
+    x = torch.rand(2, 3, 32, 32) * 2 - 1
+    assert torch.allclose(apply_affine_image(x, np.stack([IDENTITY, IDENTITY])), x, atol=1e-5)
+    assert torch.allclose(apply_affine_image(x, np.stack([HFLIP, HFLIP])), x.flip(-1), atol=1e-5)
+    mask = torch.zeros(2, 32, 32, dtype=torch.long)
+    mask[:, 8:20, 10:24] = 2
+    mask[:, 12:16, 14:18] = 3
+    p = sample_affine_params(2, seed=1)
+    assert p.shape == (2, 5) and np.array_equal(p, sample_affine_params(2, seed=1))
+    assert not np.array_equal(p, sample_affine_params(2, seed=2))
+    m2 = apply_affine(mask, p, mode="nearest")
+    assert m2.dtype == torch.long and set(m2.unique().tolist()) <= {0, 2, 3} and (m2 > 0).any()
+    # image and mask transforms agree: transforming the one-hot mask as an image gives the same labels
+    onehot = torch.nn.functional.one_hot(mask, 4).permute(0, 3, 1, 2).float()
+    assert (apply_affine(onehot, p, mode="bilinear").argmax(1) == m2).float().mean() > 0.97
+    assert torch.equal(transform_mask(mask[0], IDENTITY), mask[0])
+    assert torch.equal(transform_mask(mask[0], HFLIP), mask[0].flip(-1))
+    assert torch.equal(transform_mask(mask[0], p[0]), m2[0])
+    assert is_identity(IDENTITY) and is_hflip(HFLIP) and not is_identity(p[0]) and not is_hflip(p[0])
+    # regions moved in from outside the image are background
+    shifted = apply_affine(torch.ones(1, 1, 32, 32), np.array([[0, 0.2, 0, 0, 1]], np.float32))
+    assert shifted.min() == 0 and 0.7 < shifted.mean() < 1

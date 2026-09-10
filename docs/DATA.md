@@ -37,7 +37,9 @@ brain fractions, ET/TC presence); `stats.json`. Files are memory-mapped by the d
 DataLoader workers share them without copies. Sizes: 2.1 GB (128 px) and 8.3 GB (256 px) for train.
 
 Cached VAE latents are written next to the split arrays as
-`latents_<vae>_<modalities>_<flip|noflip>.npz` (mean and log-variance, float16, both orientations).
+`latents_<vae>_<modalities>_<flip|noflip>[_aug<K>].npz` (mean and log-variance, float16, both
+orientations; with `train.augment: K` also K random affine variants per training slice and their
+transform parameters, see `synthmri/data/augment.py`).
 
 ## Local layout on this machine
 

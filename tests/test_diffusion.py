@@ -30,6 +30,37 @@ def test_cache_latents_and_latent_dataset(processed_dir, tiny_cfg):
     assert cache_latents(vae, processed_dir, "train", tiny_cfg.data.modalities, "dummy", hflip=True, device="cpu", show_progress=False) == path
 
 
+def test_cache_latents_with_augmentation(processed_dir, tiny_cfg):
+    from synthmri.data.augment import HFLIP, IDENTITY
+
+    vae = VAEWrapper(DummyVAE())
+    kw = dict(hflip=True, augment=2, batch_size=4, num_workers=0, device="cpu", show_progress=False)
+    path = cache_latents(vae, processed_dir, "train", tiny_cfg.data.modalities, "dummy", **kw)
+    assert path.name.endswith("_flip_aug2.npz")
+    z = np.load(path)
+    n = z["mean"].shape[0]
+    assert z["mean"].shape[1] == 4 and z["aug_params"].shape == (n, 4, 5)
+    assert np.allclose(z["aug_params"][:, 0], IDENTITY) and np.allclose(z["aug_params"][:, 1], HFLIP)
+    assert np.allclose(z["mean"][:, 1], z["mean"][:, 0][..., ::-1], atol=1e-3)
+    ds = LatentDataset(path, processed_dir, "train", hflip=True)
+    masks = np.load(processed_dir / "train" / "masks.npy")
+    seen = set()
+    for _ in range(60):
+        item = ds[0]
+        seen.add(item["variant"])
+        if item["variant"] == 0:
+            assert np.array_equal(item["mask"].numpy(), masks[0])
+        elif item["variant"] == 1:
+            assert np.array_equal(item["mask"].numpy(), masks[0][:, ::-1])
+        else:
+            assert set(np.unique(item["mask"].numpy())) <= set(np.unique(masks[0]))
+    assert seen == {0, 1, 2, 3}
+    assert LatentDataset(path, processed_dir, "train", hflip=False)[0]["variant"] == 0
+    assert cache_latents(vae, processed_dir, "train", tiny_cfg.data.modalities, "dummy", **kw) == path
+    with pytest.raises(RuntimeError):
+        cache_latents(vae, processed_dir, "train", tiny_cfg.data.modalities, "dummy", **(kw | {"aug_max_rotate": 5.0}))
+
+
 @pytest.mark.parametrize("sampler", ["ddim", "ddpm"])
 def test_sampler_runs(tiny_cfg, sampler):
     unet = build_unet(tiny_cfg)
@@ -54,7 +85,8 @@ def test_sampler_guidance(tiny_cfg):
 @pytest.mark.slow
 @pytest.mark.parametrize("conditioning", ["none", "mask"])
 def test_train_end_to_end_cpu(tiny_cfg, conditioning):
-    cfg = dataclasses.replace(tiny_cfg, model=dataclasses.replace(tiny_cfg.model, conditioning=conditioning))
+    cfg = dataclasses.replace(tiny_cfg, model=dataclasses.replace(tiny_cfg.model, conditioning=conditioning),
+                              train=dataclasses.replace(tiny_cfg.train, augment=1 if conditioning == "mask" else 0))
     run = train(cfg, vae=VAEWrapper(DummyVAE()))
     assert (run / "config.yaml").exists() and (run / "metrics.csv").exists() and (run / "train_summary.json").exists()
     assert (run / "final" / "unet_ema" / "config.json").exists() and (run / "best" / "unet_ema").exists()

@@ -6,7 +6,7 @@
 By default the weights with the lowest validation loss (``<run>/best``, EMA) are used; ``--checkpoint final``
 or ``--checkpoint 150`` select the last epoch or a specific one.
 
-Outputs (default ``<run>/samples_<ckpt>_<sampler><steps>_cfg<g>_seed<s>/``): ``images.npy`` (N,3,S,S) float16
+Outputs (default ``<run>/samples_<ckpt>_<sampler><steps>_cfg<g>_seed<s>[_<split>masks]/``): ``images.npy`` (N,3,S,S) float16
 in [0,1] with the run's modality order, ``masks.npy`` for mask-conditioned models, ``meta.csv``,
 ``preview.png`` and per-modality PNGs under ``png/`` for FID.
 """
@@ -67,7 +67,8 @@ def main() -> None:
     conditional = cfg.model.conditioning == "mask"
     if not conditional:
         guidance = 1.0
-    out = Path(args.output_dir) if args.output_dir else run_dir / f"samples_{ckpt_tag}_{sampler_name}{steps}_cfg{guidance:g}_seed{seed}"
+    suffix = f"_{mask_source}masks" if conditional and mask_source != "train" else ""
+    out = Path(args.output_dir) if args.output_dir else run_dir / f"samples_{ckpt_tag}_{sampler_name}{steps}_cfg{guidance:g}_seed{seed}{suffix}"
     out.mkdir(parents=True, exist_ok=True)
 
     vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor)

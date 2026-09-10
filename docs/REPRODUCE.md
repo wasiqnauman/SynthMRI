@@ -10,7 +10,7 @@ Everything below was run on one NVIDIA RTX A6000 (48 GB) with the package versio
 ```bash
 conda env create -f environment.yml && conda activate synthmri     # Python 3.11
 # or: python -m venv .venv && . .venv/bin/activate && pip install -r requirements-lock.txt && pip install -e .
-pytest                                                              # 35 CPU-only tests, ~1 min
+pytest                                                              # 44 CPU-only tests, ~1 min
 ```
 
 `pytest` needs no data or downloads; it runs on a generated mini-BraTS (`tests/conftest.py`).
@@ -49,19 +49,24 @@ Check: train / val / test contain 15,895 / 2,159 / 4,623 tumour-bearing slices. 
 
 ```bash
 export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0
-tmux new -d -s synthmri 'bash scripts/run_experiments.sh > runs/experiments.log 2>&1'   # or nohup ... &
+nohup setsid bash scripts/queue_2026-09-09.sh >> runs/experiments.log 2>&1 &     # or inside tmux/screen
 ```
 
-Stages, models, sample counts and seeds can be restricted through environment variables
-(`STAGES`, `MODELS`, `N_SAMPLES`, `N_SAMPLES_SEG`, `SEEDS`, `SEG_EPOCHS`, `PYTHON`); see the
-header of `scripts/run_experiments.sh`. The script is sequential, stops at the first error and skips
-stages whose outputs already exist, so it can simply be re-launched after a fix. Approximate cost:
+`scripts/queue_2026-09-09.sh` is the exact order behind the reported numbers: baseline evaluation →
+train the `do01` and `reg` candidates → `scripts/select_model.py` (validation data only) →
+segmentation study with the chosen model's samples → unconditional and 256 px models with the chosen
+recipe → tables and figures. It is a thin wrapper around `scripts/run_experiments.sh`, whose stages,
+models, sample counts and seeds can be restricted through environment variables (`STAGES`, `MODELS`,
+`CKPT`, `N_SAMPLES`, `N_SAMPLES_SEG`, `N_CURVE`, `SEEDS`, `SEG_SOURCE`, `SEG_EPOCHS`, `PYTHON`); see
+its header. The runner is sequential, stops at the first error and skips stages whose outputs
+already exist, so it can simply be re-launched after a fix. Approximate cost:
 
 | stage | what | time |
 |---|---|---|
-| train `ldm128_maskcond`, `ldm128_uncond`, `ldm128_maskcond_do01` | 200 epochs, 49.6k steps each | ~1.3 h each (23 s / epoch) |
-| train `ldm256_maskcond` | 200 epochs, 99.2k steps | ~5–6 h |
-| sample + evaluate | 5,000 samples per setting from `best/` (20,000 for the segmentation pool), FID/KID, diversity, memorisation | ~1–2 h total |
+| train each 128 px model (`ldm128_maskcond`, `_do01`, `_reg`, `ldm128_uncond*`) | 200 epochs, 49.6k steps | ~1.3 h (23 s / epoch) |
+| latent cache | once per (resolution, modalities, augmentation); `_reg` encodes 8 variants per training slice | ~1 min plain, ~7 min with `augment: 6` at 128 px (roughly 4× at 256 px) |
+| train `ldm256_maskcond*` | 200 epochs, 99.2k steps | ~5–6 h |
+| sample + evaluate | per mask model: 20,000 samples (training masks, g = 2), 5,000 (g = 1), 5,000 (validation masks, g = 2); per unconditional model 5,000; FID/KID, diversity, memorisation | ~1–2 h total |
 | checkpoint curve | 2,000 samples per saved checkpoint, FID vs val + memorisation | ~30 min per model |
 | segmentation study | 21 U-Nets × 40 epochs (3 seeds × {10 %, 25 %, 100 %} × {real, real + synthetic} + synthetic-only) | ~3–4 h |
 | collect | tables + figures | seconds |
@@ -74,7 +79,9 @@ python scripts/sample.py   --run runs/ldm128_maskcond --num_images 5000 --guidan
 #                                                     -> runs/ldm128_maskcond/samples_best_ddim50_cfg2_seed0
 python scripts/evaluate.py --run runs/ldm128_maskcond --samples runs/ldm128_maskcond/samples_best_ddim50_cfg2_seed0
 #                                                     -> .../samples_best_ddim50_cfg2_seed0/eval/{results.json,results.md,*.png}
+python scripts/sample.py   --run runs/ldm128_maskcond --num_images 5000 --guidance_scale 2.0 --mask_source val   # unseen masks -> ..._valmasks
 python scripts/checkpoint_curve.py --run runs/ldm128_maskcond   # -> runs/ldm128_maskcond/checkpoint_curve.json
+python scripts/select_model.py runs/ldm128_maskcond runs/ldm128_maskcond_do01 runs/ldm128_maskcond_reg   # -> results/model_selection.json
 python scripts/train_seg.py --config configs/ldm128_maskcond.yaml --real_fraction 0.1 --seed 0 \
     --synthetic runs/ldm128_maskcond/samples_best_ddim50_cfg2_seed0 --out runs/seg/real010_synth_s0
 python scripts/collect_results.py      # -> docs/results_tables.md, results/summary.json

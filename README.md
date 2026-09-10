@@ -53,6 +53,8 @@ python scripts/train.py    --config configs/ldm128_maskcond.yaml          # or l
 python scripts/sample.py   --run runs/ldm128_maskcond --num_images 5000 --guidance_scale 2.0   # best-val-loss weights
 python scripts/evaluate.py --run runs/ldm128_maskcond --samples runs/ldm128_maskcond/samples_best_ddim50_cfg2_seed0
 python scripts/checkpoint_curve.py --run runs/ldm128_maskcond                                    # FID/memorisation per checkpoint
+python scripts/sample.py   --run runs/ldm128_maskcond --num_images 5000 --guidance_scale 2.0 --mask_source val   # unseen (validation) masks
+python scripts/select_model.py runs/ldm128_maskcond runs/ldm128_maskcond_do01 runs/ldm128_maskcond_reg   # validation-only choice of the main recipe
 python scripts/train_seg.py --config configs/ldm128_maskcond.yaml --out runs/seg/real100_s0            # real only
 python scripts/train_seg.py --config configs/ldm128_maskcond.yaml --real_fraction 0.1 \
     --synthetic runs/ldm128_maskcond/samples_best_ddim50_cfg2_seed0 --out runs/seg/real010_synth_s0
@@ -61,8 +63,9 @@ python scripts/train_seg.py --config configs/ldm128_maskcond.yaml --real_fractio
 Any config value can be overridden on the command line with dotted keys, e.g.
 `python scripts/train.py --config configs/ldm128_uncond.yaml train.epochs=50 train.batch_size=32`.
 `configs/smoke.yaml` runs the whole pipeline for 30 steps as a check. `scripts/run_experiments.sh`
-reproduces the full set of experiments in [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md); results are
-collected in [docs/RESULTS.md](docs/RESULTS.md).
+reproduces the full set of experiments in [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) (the `_reg`
+configs add U-Net dropout and cached affine augmentation, `train.augment`); results are collected in
+[docs/RESULTS.md](docs/RESULTS.md).
 
 Each run directory contains `config.yaml`, `run_info.json` (git commit, versions), `metrics.csv`,
 TensorBoard logs (`tb/`), periodic sample sheets (`samples/`), epoch checkpoints, `best/` (lowest

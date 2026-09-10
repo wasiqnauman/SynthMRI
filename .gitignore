@@ -14,9 +14,9 @@ htmlcov/
 .ipynb_checkpoints/
 
 # Data, caches, model weights and experiment outputs are regenerable (see docs/DATA.md).
-data/
-runs/
-outputs/
+/data/
+/runs/
+/outputs/
 *.pt
 *.pth
 *.safetensors

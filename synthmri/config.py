@@ -81,6 +81,11 @@ class TrainConfig:
     mixed_precision: str = "bf16"  # "no" | "fp16" | "bf16"
     use_cached_latents: bool = True  # encode the dataset once with the frozen VAE
     hflip: bool = True  # random horizontal flip (cached for both orientations)
+    augment: int = 0  # extra random affine variants (flip/shift/rotation/scale) cached per training slice
+    aug_max_shift: float = 0.06  # fraction of the image size
+    aug_max_rotate: float = 10.0  # degrees
+    aug_scale: tuple[float, float] = (0.9, 1.1)
+    aug_seed: int = 0
     val_every: int = 1  # epochs
     sample_every: int = 10  # epochs
     save_every: int = 10  # epochs

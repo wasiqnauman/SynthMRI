@@ -1,5 +1,38 @@
 # Work log
 
+## 2026-09-09 -- Regularised recipe (cached affine augmentation + dropout), validation-only model selection, unseen-mask sample sets; `.gitignore` was hiding `synthmri/data/`
+
+The baseline LDM-128-mask memorises training slices after epoch ~34 (previous entry), so two
+regularised candidates are trained next to it: `_do01` (U-Net dropout 0.1) and `_reg` (dropout 0.1
+plus `train.augment: 6`). With `augment: K`, `cache_latents` encodes every training slice K extra
+times under random affine transforms (horizontal flip, shift up to 6 % of the image, rotation up to
+±10°, isotropic scale 0.9–1.1; `synthmri/data/augment.py`), stores the parameters in the cache
+(`..._aug6.npz`) and `LatentDataset` draws one of the 8 variants per access, transforming the
+conditioning mask with the same parameters (nearest neighbour). Validation latents are never
+augmented. The winner among baseline / do01 / reg is chosen by `scripts/select_model.py` with a
+rule fixed before the runs finished: lowest FID against real *validation* slices at the
+lowest-validation-loss checkpoint, excluding runs whose memorisation fraction exceeds 0.15; the
+test set is not used. The chosen run supplies the pool for the segmentation study, and its recipe is
+reused for the unconditional and 256 px models (`configs/*_do01.yaml`, `configs/*_reg.yaml`).
+Mask-conditioned models also get a 5,000-sample set conditioned on masks of *validation* patients
+(`sample.py --mask_source val`, directory suffix `_valmasks`) to measure generalisation to tumour
+shapes never seen in training. `scripts/run_experiments.sh` runs all of this; the exact overnight
+order is `scripts/queue_2026-09-09.sh` (log `runs/experiments.log`).
+
+Also fixed: `.gitignore` listed `data/` unanchored, which matched `synthmri/data/` -- the whole
+data package (BraTS loading, preprocessing, splits, datasets) was missing from every commit on this
+branch. Patterns are now anchored to the repository root (`/data/`, `/runs/`, `/outputs/`) and the
+package is committed.
+
+Files: .gitignore, synthmri/data/augment.py, synthmri/data/dataset.py, synthmri/diffusion/latents.py,
+synthmri/diffusion/train.py, synthmri/config.py, scripts/sample.py, scripts/select_model.py,
+scripts/run_experiments.sh, scripts/queue_2026-09-09.sh, configs/ldm128_maskcond_reg.yaml,
+configs/ldm128_uncond_reg.yaml, configs/ldm256_maskcond_reg.yaml, configs/ldm128_uncond_do01.yaml,
+configs/ldm256_maskcond_do01.yaml, tests/test_data.py, tests/test_diffusion.py, docs/EXPERIMENTS.md,
+docs/REPRODUCE.md, docs/DATA.md, docs/ARCHITECTURE.md, README.md
+Follow-ups: fill docs/RESULTS.md from the finished queue (checkpoint curves, model selection table,
+ablation, segmentation Dice); measure the 256 px augmented-cache time
+
 ## 2026-09-09 -- Early stopping on validation loss; checkpoint FID/memorisation curve; dropout ablation
 
 While LDM-128-mask was training, the validation diffusion loss bottomed out at epoch 34 and then

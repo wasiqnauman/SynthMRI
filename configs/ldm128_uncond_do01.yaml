@@ -1,0 +1,8 @@
+# Dropout-only ablation recipe (U-Net dropout 0.1, no affine augmentation) on top of ldm128_uncond.yaml.
+_base_: ldm128_uncond.yaml
+name: ldm128_uncond_do01
+model:
+  unet:
+    dropout: 0.1
+train:
+  output_dir: runs/ldm128_uncond_do01

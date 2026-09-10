@@ -1,0 +1,10 @@
+# Regularised recipe: U-Net dropout 0.1 + 6 cached random affine augmentations per training slice
+# (flip / shift <= 6 % / rotation <= 10 deg / scale 0.9-1.1) on top of ldm128_maskcond.yaml.
+_base_: ldm128_maskcond.yaml
+name: ldm128_maskcond_reg
+model:
+  unet:
+    dropout: 0.1
+train:
+  output_dir: runs/ldm128_maskcond_reg
+  augment: 6

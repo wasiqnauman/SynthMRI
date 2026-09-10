@@ -8,7 +8,7 @@ The pipeline is a 2-D latent diffusion model (Rombach et al., 2022) over axial B
 |---|---|---|
 | Preprocess | 3-D NIfTI → per-volume normalised 2-D tumour slices, patient-level splits | `synthmri/data/` |
 | Compress | frozen Stable-Diffusion VAE (`stabilityai/sd-vae-ft-mse`), 8× spatial, 4 latent channels | `synthmri/models/vae.py` |
-| Cache | posterior mean/log-variance per slice (and its horizontal flip), stored once | `synthmri/diffusion/latents.py` |
+| Cache | posterior mean/log-variance per slice (its horizontal flip and, with `train.augment: K`, K random affine variants), stored once | `synthmri/diffusion/latents.py`, `synthmri/data/augment.py` |
 | Denoise | `UNet2DModel` (diffusers), ε-prediction, 1000-step linear DDPM schedule | `synthmri/models/unet.py`, `synthmri/diffusion/train.py` |
 | Condition | one-hot tumour mask average-pooled to the latent grid + null channel, 10 % condition dropout | `synthmri/diffusion/conditioning.py` |
 | Sample | DDIM (default 50 steps) or ancestral DDPM, classifier-free guidance | `synthmri/diffusion/sample.py` |
@@ -37,7 +37,9 @@ ceiling for the generator.
 **Frozen VAE + cached latents.** With a frozen VAE the posterior of a slice never changes, so encoding
 it every step is wasted work. Caching the posterior parameters (not a single sample) and sampling
 `z = μ + σ·ε` on each access is exactly equivalent to online `latent_dist.sample()`. Both orientations
-are cached so horizontal-flip augmentation stays free. The notebook's joint VAE/U-Net fine-tuning was
+are cached so horizontal-flip augmentation stays free; `train.augment: K` extends the same idea to K
+random affine variants (flip / shift / rotation / scale) per slice, with the transform parameters
+stored so the conditioning mask can be transformed identically at access time. The notebook's joint VAE/U-Net fine-tuning was
 removed: its VAE loss was a plain MSE (no KL/perceptual term), and moving the encoder shifts the latent
 distribution under the diffusion model while training.
 

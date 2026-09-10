@@ -10,10 +10,10 @@ export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 PY="${PYTHON:-python}"
 STAGES="${STAGES:-preprocess train sample eval curve seg collect}"
-MODELS="${MODELS:-ldm128_maskcond ldm128_uncond ldm256_maskcond ldm128_maskcond_do01}"
+MODELS="${MODELS:-ldm128_maskcond ldm128_maskcond_do01 ldm128_maskcond_reg ldm128_uncond ldm128_uncond_reg ldm256_maskcond_reg}"
 CKPT="${CKPT:-best}"                    # checkpoint behind every reported sample set (lowest validation loss)
 N_SAMPLES="${N_SAMPLES:-5000}"          # samples per model/setting for FID/KID etc.
-N_SAMPLES_SEG="${N_SAMPLES_SEG:-20000}" # pool of paired samples for the segmentation study
+N_SAMPLES_SEG="${N_SAMPLES_SEG:-20000}" # paired samples per mask-conditioned model (pool for the segmentation study)
 N_CURVE="${N_CURVE:-2000}"              # samples per checkpoint for the FID/memorisation curve
 SEEDS="${SEEDS:-0 1 2}"
 SEG_CFG="${SEG_CFG:-configs/ldm128_maskcond.yaml}"
@@ -22,10 +22,12 @@ SEG_EPOCHS="${SEG_EPOCHS:-40}"
 
 has() { [[ " $STAGES " == *" $1 "* ]]; }
 log() { echo "[$(date '+%F %T')] $*"; }
-sample() {  # <run> <n> <guidance>
-  local dir="$1/samples_${CKPT}_ddim50_cfg$3_seed0"
+sample() {  # <run> <n> <guidance> [mask split]
+  local suffix=""
+  [[ -n "${4:-}" && "$4" != train ]] && suffix="_${4}masks"
+  local dir="$1/samples_${CKPT}_ddim50_cfg$3_seed0$suffix"
   if [[ -f "$dir/images.npy" ]]; then log "skip sample $dir (exists)"; return; fi
-  $PY scripts/sample.py --run "$1" --checkpoint "$CKPT" --num_images "$2" --guidance_scale "$3"
+  $PY scripts/sample.py --run "$1" --checkpoint "$CKPT" --num_images "$2" --guidance_scale "$3" ${4:+--mask_source "$4"}
 }
 evaluate() {  # <run> <samples dir> [evaluate.py args]
   if [[ -f "$2/eval/results.json" ]]; then log "skip eval $2 (exists)"; return; fi
@@ -51,9 +53,9 @@ for m in $MODELS; do
   if has sample; then
     log "sample $m"
     if [[ $cond == mask ]]; then
-      n=$N_SAMPLES; [[ "$run/samples_${CKPT}_ddim50_cfg2_seed0" == "$SEG_SOURCE" ]] && n=$N_SAMPLES_SEG
-      sample "$run" "$n" 2
+      sample "$run" "$N_SAMPLES_SEG" 2
       sample "$run" "$N_SAMPLES" 1
+      sample "$run" "$N_SAMPLES" 2 val      # unseen masks: generalisation beyond training tumour shapes
     else
       sample "$run" "$N_SAMPLES" 1
     fi
@@ -63,6 +65,7 @@ for m in $MODELS; do
     if [[ $cond == mask ]]; then
       evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg2_seed0"
       evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg1_seed0" --skip_recon
+      evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg2_seed0_valmasks" --skip_recon
     else
       evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg1_seed0"
     fi

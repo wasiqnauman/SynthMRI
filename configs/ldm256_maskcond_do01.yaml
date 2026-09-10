@@ -1,0 +1,8 @@
+# Dropout-only ablation recipe (U-Net dropout 0.1, no affine augmentation) on top of ldm256_maskcond.yaml.
+_base_: ldm256_maskcond.yaml
+name: ldm256_maskcond_do01
+model:
+  unet:
+    dropout: 0.1
+train:
+  output_dir: runs/ldm256_maskcond_do01

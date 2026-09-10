@@ -100,9 +100,10 @@ def _build_datasets(cfg: Config, vae: VAEWrapper | None, device, logger):
             raise RuntimeError("use_cached_latents requires a VAE")
         files = {}
         for split in ("train", "val"):
+            aug = dict(augment=t.augment, aug_max_shift=t.aug_max_shift, aug_max_rotate=t.aug_max_rotate, aug_scale=t.aug_scale, aug_seed=t.aug_seed) if split == "train" else {}
             files[split] = cache_latents(
                 vae, d.processed_dir, split, d.modalities, cfg.model.vae.pretrained, hflip=t.hflip,
-                batch_size=t.batch_size, num_workers=min(t.num_workers, 4), device=device,
+                batch_size=t.batch_size, num_workers=min(t.num_workers, 4), device=device, **aug,
             )
             logger.info(f"cached latents [{split}]: {files[split]}")
         train_ds = LatentDataset(files["train"], d.processed_dir, "train", hflip=t.hflip)
