@@ -70,6 +70,7 @@ already exist, so it can simply be re-launched after a fix. Approximate cost:
 | checkpoint curve | 2,000 samples per saved checkpoint, FID vs val + memorisation | ~30 min per model |
 | segmentation study | 21 U-Nets × 40 epochs (3 seeds × {10 %, 25 %, 100 %} × {real, real + synthetic} + synthetic-only) | ~3–4 h |
 | secondary segmentation analyses (`seg2`) | 27 U-Nets (3 seeds × 3 fractions × {1:1 synthetic, synthetic pre-training, VAE-reconstructed real}) | ~4 h |
+| VAE decoder fine-tune + re-decoded 128 px sets + segmentation study (`VAE_DECODER=runs/vae_dec_brats128/decoder.pt SEG_DIR=runs/seg_ftdec MODELS=ldm128_maskcond_reg SEG_CFG=configs/ldm128_maskcond_reg.yaml SEG_SOURCE=runs/ldm128_maskcond_reg/samples_best_ddim50_cfg2_seed0_ftdec STAGES="vaedec sample eval seg seg2 collect"`) | decoder ≈ 0.5 h, 30k samples ≈ 15 min, 3 evals, 48 U-Nets | ~10 h |
 | pre-training control (`seg3`) | 9 U-Nets (3 seeds × 3 fractions, 20 + 40 epochs on real slices) | ~1.5 h |
 | segmentation study at 256 px (`SEG_DIR=runs/seg256 SEG_CFG=configs/ldm256_maskcond_reg.yaml SEG_SOURCE=runs/ldm256_maskcond_reg/samples_best_ddim50_cfg2_seed0 STAGES="seg collect"`) | 21 U-Nets on 256 px slices | ~12 h |
 | collect | tables + figures | seconds |

@@ -79,6 +79,7 @@ def main() -> None:
     p.add_argument("--skip_fid", action="store_true")
     p.add_argument("--skip_recon", action="store_true")
     p.add_argument("--no_lpips", action="store_true")
+    p.add_argument("--vae_decoder", default=None, help="decoder.pt from scripts/finetune_vae_decoder.py for the reconstruction ceiling")
     args = p.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -88,7 +89,8 @@ def main() -> None:
     samples_dir = Path(args.samples)
     out = samples_dir / "eval"
     out.mkdir(parents=True, exist_ok=True)
-    results: dict = {"run": str(run_dir), "samples": str(samples_dir), "modalities": list(mods)}
+    vae_decoder = args.vae_decoder or cfg.model.vae.decoder_weights
+    results: dict = {"run": str(run_dir), "samples": str(samples_dir), "modalities": list(mods), "vae_decoder": vae_decoder}
 
     test_ds = SliceDataset(cfg.data.processed_dir, "test", mods, hflip=False)
     val_ds = SliceDataset(cfg.data.processed_dir, "val", mods, hflip=False)
@@ -98,7 +100,7 @@ def main() -> None:
     print(f"samples {fake.shape} | real test {real_test.shape}")
 
     if not args.skip_recon:
-        vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor)
+        vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor, decoder_weights=vae_decoder)
         results["vae_reconstruction"] = evaluate_vae_reconstruction(vae, test_ds, mods, device, max_items=args.max_real, use_lpips=not args.no_lpips)
         save_reconstruction_examples(vae, test_ds, out / "vae_reconstruction_examples.png", list(range(0, len(test_ds), max(1, len(test_ds) // 6)))[:6], device)
         print("VAE reconstruction:", json.dumps(results["vae_reconstruction"]["metrics"]["rgb"]))

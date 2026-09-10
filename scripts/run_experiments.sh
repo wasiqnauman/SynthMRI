@@ -4,6 +4,8 @@
 #   bash scripts/run_experiments.sh                                          # everything
 #   STAGES="train sample eval curve" MODELS="ldm128_maskcond" bash scripts/run_experiments.sh
 #   STAGES="seg seg2 seg3 collect" bash scripts/run_experiments.sh           # only the downstream study
+#   VAE_DECODER=runs/vae_dec_brats128/decoder.pt SEG_DIR=runs/seg_ftdec MODELS=ldm128_maskcond_reg \
+#     SEG_SOURCE=runs/ldm128_maskcond_reg/samples_best_ddim50_cfg2_seed0_ftdec STAGES="vaedec sample eval seg seg2 collect" bash scripts/run_experiments.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
@@ -20,6 +22,8 @@ SEG_CFG="${SEG_CFG:-configs/ldm128_maskcond.yaml}"
 SEG_EPOCHS="${SEG_EPOCHS:-40}"
 SEG_DIR="${SEG_DIR:-runs/seg}"          # e.g. SEG_DIR=runs/seg256 SEG_CFG=configs/ldm256_maskcond_reg.yaml SEG_SOURCE=runs/ldm256_maskcond_reg/samples_...
 PRETRAIN_EPOCHS="${PRETRAIN_EPOCHS:-20}"
+VAE_DECODER="${VAE_DECODER:-}"          # decoder.pt from scripts/finetune_vae_decoder.py: samples/eval/VAE control use it (dirs get _ftdec)
+DEC_SUFFIX=""; [[ -n "$VAE_DECODER" ]] && DEC_SUFFIX="_ftdec"
 if [[ -z "${SEG_SOURCE:-}" ]]; then  # default: the model chosen by scripts/select_model.py, else the baseline
   SEG_MODEL=$([[ -f results/model_selection.json ]] && $PY -c "import json; print(json.load(open('results/model_selection.json'))['chosen'])" || echo ldm128_maskcond)
   SEG_SOURCE="runs/$SEG_MODEL/samples_${CKPT}_ddim50_cfg2_seed0"
@@ -30,18 +34,23 @@ log() { echo "[$(date '+%F %T')] $*"; }
 sample() {  # <run> <n> <guidance> [mask split]
   local suffix=""
   [[ -n "${4:-}" && "$4" != train ]] && suffix="_${4}masks"
-  local dir="$1/samples_${CKPT}_ddim50_cfg$3_seed0$suffix"
+  local dir="$1/samples_${CKPT}_ddim50_cfg$3_seed0$suffix$DEC_SUFFIX"
   if [[ -f "$dir/images.npy" ]]; then log "skip sample $dir (exists)"; return; fi
-  $PY scripts/sample.py --run "$1" --checkpoint "$CKPT" --num_images "$2" --guidance_scale "$3" ${4:+--mask_source "$4"}
+  $PY scripts/sample.py --run "$1" --checkpoint "$CKPT" --num_images "$2" --guidance_scale "$3" ${4:+--mask_source "$4"} ${VAE_DECODER:+--vae_decoder "$VAE_DECODER"}
 }
 evaluate() {  # <run> <samples dir> [evaluate.py args]
   if [[ -f "$2/eval/results.json" ]]; then log "skip eval $2 (exists)"; return; fi
-  $PY scripts/evaluate.py --run "$1" --samples "$2" --max_fake "$N_SAMPLES" "${@:3}"
+  $PY scripts/evaluate.py --run "$1" --samples "$2" --max_fake "$N_SAMPLES" ${VAE_DECODER:+--vae_decoder "$VAE_DECODER"} "${@:3}"
 }
 seg() {  # <out dir> [train_seg.py args]
   if [[ -f "$1/results.json" ]]; then log "skip seg $1 (exists)"; return; fi
   $PY scripts/train_seg.py --config "$SEG_CFG" --epochs "$SEG_EPOCHS" --out "$1" "${@:2}"
 }
+
+if has vaedec; then  # decoder fine-tune (docs/EXPERIMENTS.md); VAE_DECODER must point at <out dir>/decoder.pt
+  [[ -n "$VAE_DECODER" ]] || { echo "vaedec stage needs VAE_DECODER=<out dir>/decoder.pt"; exit 1; }
+  if [[ -f "$VAE_DECODER" ]]; then log "skip vaedec ($VAE_DECODER exists)"; else log "vaedec -> $VAE_DECODER"; $PY scripts/finetune_vae_decoder.py --config "$SEG_CFG" --out "$(dirname "$VAE_DECODER")"; fi
+fi
 
 if has preprocess; then
   [[ -f data/processed/brats128/stats.json ]] || $PY scripts/preprocess.py --config configs/ldm128_maskcond.yaml
@@ -68,11 +77,11 @@ for m in $MODELS; do
   if has eval; then
     log "eval $m"
     if [[ $cond == mask ]]; then
-      evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg2_seed0"
-      evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg1_seed0" --skip_recon
-      evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg2_seed0_valmasks" --skip_recon
+      evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg2_seed0$DEC_SUFFIX"
+      evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg1_seed0$DEC_SUFFIX" --skip_recon
+      evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg2_seed0_valmasks$DEC_SUFFIX" --skip_recon
     else
-      evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg1_seed0"
+      evaluate "$run" "$run/samples_${CKPT}_ddim50_cfg1_seed0$DEC_SUFFIX"
     fi
   fi
   if has curve; then
@@ -100,7 +109,7 @@ if has seg2; then  # secondary analyses (docs/EXPERIMENTS.md): 1:1 synthetic, VA
       tag=$(printf "real%03d" "$(awk "BEGIN{print int($frac*100+0.5)}")")
       log "seg2 $tag seed $s"
       seg "$SEG_DIR/${tag}_synth1x_s$s" --real_fraction "$frac" --seed "$s" --synthetic "$SEG_SOURCE" --synth_ratio 1.0
-      seg "$SEG_DIR/${tag}_vae_s$s" --real_fraction "$frac" --seed "$s" --real_through_vae
+      seg "$SEG_DIR/${tag}_vae_s$s" --real_fraction "$frac" --seed "$s" --real_through_vae ${VAE_DECODER:+--vae_decoder "$VAE_DECODER"}
       seg "$SEG_DIR/${tag}_pre_s$s" --real_fraction "$frac" --seed "$s" --pretrain_synthetic "$SEG_SOURCE" --pretrain_epochs "$PRETRAIN_EPOCHS"
     done
   done

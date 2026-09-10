@@ -48,6 +48,7 @@ def main() -> None:
     p.add_argument("--mask_source", default=None, help="split whose masks condition the samples")
     p.add_argument("--output_dir", default=None)
     p.add_argument("--no_png", action="store_true", help="skip PNG export")
+    p.add_argument("--vae_decoder", default=None, help="decoder.pt from scripts/finetune_vae_decoder.py; output dir gets the suffix _ftdec")
     args = p.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -68,10 +69,13 @@ def main() -> None:
     if not conditional:
         guidance = 1.0
     suffix = f"_{mask_source}masks" if conditional and mask_source != "train" else ""
+    vae_decoder = args.vae_decoder or cfg.model.vae.decoder_weights
+    if vae_decoder:
+        suffix += "_ftdec"
     out = Path(args.output_dir) if args.output_dir else run_dir / f"samples_{ckpt_tag}_{sampler_name}{steps}_cfg{guidance:g}_seed{seed}{suffix}"
     out.mkdir(parents=True, exist_ok=True)
 
-    vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor)
+    vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor, decoder_weights=vae_decoder)
     sampler = LatentSampler(unet, vae, cfg.diffusion, cfg.latent_size, sampler_name, steps, guidance, eta,
                             cfg.model.num_mask_classes, device)
     gen = torch.Generator(device=device).manual_seed(seed)
@@ -113,7 +117,7 @@ def main() -> None:
     save_json(
         {"run": str(run_dir), "checkpoint": ckpt_tag, "unet_dir": str(unet_dir), "num_images": num_images, "sampler": sampler_name, "steps": steps,
          "guidance_scale": guidance, "eta": eta, "seed": seed, "use_ema": not args.no_ema, "mask_source": mask_source if conditional else None,
-         "modalities": list(cfg.data.modalities), "seconds": time.time() - t0, "git_commit": git_commit_hash(), "argv": sys.argv},
+         "modalities": list(cfg.data.modalities), "vae_decoder": vae_decoder, "seconds": time.time() - t0, "git_commit": git_commit_hash(), "argv": sys.argv},
         out / "sample_info.json",
     )
     preview_masks = torch.from_numpy(np.concatenate(masks)[:8].astype(np.int64)) if masks else None

@@ -107,7 +107,7 @@ def main() -> None:
             f = flip[s : s + args.batch_size]
             m[f] = m[f].flip(-1)
             cond_batches.append(mask_to_condition(m, cfg.model.num_mask_classes, cfg.latent_size))
-    vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor)
+    vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor, decoder_weights=cfg.model.vae.decoder_weights)
 
     for tag, ckpt in list_checkpoints(run):
         if args.only and tag not in args.only:

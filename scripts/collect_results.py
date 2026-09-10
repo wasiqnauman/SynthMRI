@@ -53,24 +53,40 @@ def generation_tables(runs_dir: Path) -> tuple[list[str], dict]:
         )
         summary[f"{run}/{tag}"] = {k: v for k, v in r.items() if k not in ("memorisation",)} | {"memorisation": {k: v for k, v in m.items() if k != "nn_index"}}
     lines.append("")
-    # VAE ceiling: depends only on the data (resolution), so one block per processed dataset
+    # VAE ceiling: depends only on the data (resolution) and the decoder, so one block per (dataset, decoder)
     seen = set()
-    vae_lines = ["## VAE reconstruction ceiling (real test slices; frozen VAE, so it depends only on the data)", "",
-                 "| data | channel | PSNR (dB) | SSIM | LPIPS |", "|---|---|---|---|---|"]
+    vae_lines = ["## VAE reconstruction ceiling (real test slices; depends only on the data and the decoder, not on the diffusion model)", "",
+                 "| data | decoder | channel | PSNR (dB) | SSIM | LPIPS |", "|---|---|---|---|---|---|"]
     for p in rows:
         r = json.loads(p.read_text())
         if "vae_reconstruction" not in r:
             continue
         cfg_file = p.parents[2] / "config.yaml"
         data = Path(yaml.safe_load(cfg_file.read_text())["data"]["processed_dir"]).name if cfg_file.exists() else p.parents[2].name
-        if data in seen:
+        dec = f"fine-tuned (`{Path(r['vae_decoder']).parent.name}`)" if r.get("vae_decoder") else "frozen"
+        if (data, dec) in seen:
             continue
-        seen.add(data)
+        seen.add((data, dec))
         for k, mm in r["vae_reconstruction"]["metrics"].items():
             lp = mm.get("lpips", {}).get("mean", float("nan"))
-            vae_lines.append(f"| {data} ({p.parents[2].name}) | {k} | {fmt(mm['psnr']['mean'], mm['psnr']['std'], 2)} | {fmt(mm['ssim']['mean'], mm['ssim']['std'])} | {lp:.3f} |")
+            vae_lines.append(f"| {data} ({p.parents[2].name}) | {dec} | {k} | {fmt(mm['psnr']['mean'], mm['psnr']['std'], 2)} | {fmt(mm['ssim']['mean'], mm['ssim']['std'])} | {lp:.3f} |")
     if len(vae_lines) > 4:
         lines += vae_lines + [""]
+    # decoder fine-tuning runs (scripts/finetune_vae_decoder.py): paired before/after ceiling on the same test slices
+    ft_files = sorted(runs_dir.glob("vae_dec_*/results.json"))
+    if ft_files:
+        lines += ["## VAE decoder fine-tuning (test-slice reconstruction ceiling before / after; encoder unchanged)", "",
+                  "| run | data | epochs (best) | trainable params | PSNR before → after | SSIM before → after | LPIPS before → after |",
+                  "|---|---|---|---|---|---|---|"]
+        for f in ft_files:
+            r = json.loads(f.read_text())
+            b, a = r["test_ceiling_before"]["metrics"]["rgb"], r["test_ceiling_after"]["metrics"]["rgb"]
+            ft = r["finetune"]
+            lp_b, lp_a = b.get("lpips", {}).get("mean", float("nan")), a.get("lpips", {}).get("mean", float("nan"))
+            lines.append(f"| {f.parent.name} | {r['dataset']} | {ft['epochs_run']} ({ft['best_epoch']}) | {ft['n_trainable_params'] / 1e6:.1f}M | "
+                         f"{b['psnr']['mean']:.2f} → {a['psnr']['mean']:.2f} | {b['ssim']['mean']:.3f} → {a['ssim']['mean']:.3f} | {lp_b:.3f} → {lp_a:.3f} |")
+            summary[f"vae_finetune/{f.parent.name}"] = {"before": b, "after": a, "finetune": ft}
+        lines.append("")
     return lines, summary
 
 

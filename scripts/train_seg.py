@@ -75,6 +75,7 @@ def main() -> None:
     p.add_argument("--synth_ratio", type=float, default=None, help="synthetic slices as a multiple of the real slice count (overrides --n_synth)")
     p.add_argument("--synthetic_only", action="store_true")
     p.add_argument("--real_through_vae", action="store_true", help="control: real training images replaced by their frozen-VAE reconstructions")
+    p.add_argument("--vae_decoder", default=None, help="decoder.pt from scripts/finetune_vae_decoder.py, used by --real_through_vae")
     p.add_argument("--pretrain_synthetic", default=None, help="sample directory: train on it alone first, then fine-tune on the real slices")
     p.add_argument("--pretrain_real", action="store_true", help="control for --pretrain_synthetic: pre-train on the real slices themselves")
     p.add_argument("--pretrain_epochs", type=int, default=20)
@@ -100,7 +101,8 @@ def main() -> None:
     tr_img, tr_msk, tr_pid = tr_img[keep], tr_msk[keep], tr_pid[keep]
     n_real, n_real_patients = int(tr_img.shape[0]), int(len(np.unique(tr_pid)))
     if args.real_through_vae:
-        vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor)
+        vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor,
+                       decoder_weights=args.vae_decoder or cfg.model.vae.decoder_weights)
         tr_img = vae_roundtrip(tr_img, vae, device)
         del vae
         torch.cuda.empty_cache()
@@ -145,6 +147,7 @@ def main() -> None:
         "args": vars(args), "seg_config": asdict(seg_cfg), "n_real_slices": n_real, "n_real_patients": n_real_patients,
         "n_synthetic": n_synth, "synthetic_only": bool(args.synthetic_only), "eval_split": args.eval_split,
         "synth_ratio": args.synth_ratio, "real_through_vae": bool(args.real_through_vae),
+        "vae_decoder": (args.vae_decoder or cfg.model.vae.decoder_weights) if args.real_through_vae else None,
         "n_pretrain_synthetic": n_pretrain, "n_pretrain_real": n_pretrain_real,
         "pretrain_epochs": args.pretrain_epochs if (args.pretrain_synthetic or args.pretrain_real) else 0,
         "synthetic_patient_matched": bool(args.synthetic and not args.no_match_patients and not args.synthetic_only),

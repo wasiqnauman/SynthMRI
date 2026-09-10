@@ -37,6 +37,7 @@ class DataConfig:
 class VAEConfig:
     pretrained: str = "stabilityai/sd-vae-ft-mse"
     scaling_factor: float | None = None  # None -> vae.config.scaling_factor
+    decoder_weights: str | None = None  # decoder.pt from scripts/finetune_vae_decoder.py (encoder unchanged)
 
 
 @dataclass

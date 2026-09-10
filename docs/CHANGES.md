@@ -1,5 +1,25 @@
 # Work log
 
+## 2026-09-10 -- VAE decoder fine-tuning (queued) and pre-training control
+
+The VAE-reconstructed-real control alone reproduces the segmentation loss at 10 % real (seed 0:
+0.652 → 0.604), so the frozen natural-image decoder is the suspected bottleneck. New
+`synthmri/models/vae_finetune.py` + `scripts/finetune_vae_decoder.py` train only `decoder` +
+`post_quant_conv` (L1 + LPIPS-VGG, validation-selected epoch) and report the test ceiling before /
+after; `load_vae(decoder_weights=...)`, `model.vae.decoder_weights` in the config and `--vae_decoder`
+on `sample.py` (output suffix `_ftdec`), `evaluate.py` and `train_seg.py` decode with it; the
+runner gets `VAE_DECODER` and a `vaedec` stage; `collect_results.py` keys the ceiling table by
+decoder and adds a fine-tuning table. Declared in EXPERIMENTS.md with its reading rules before any
+decoder was trained; `scripts/queue_2026-09-10d.sh` runs it after the pre-training control
+(decoder → re-decoded sample sets → eval → `runs/seg_ftdec/` primary + secondary, ~10 h).
+Test: `tests/test_models.py::test_decoder_finetune_and_reload` (46 CPU tests).
+
+Files: synthmri/models/vae.py, synthmri/models/vae_finetune.py, synthmri/models/__init__.py, synthmri/config.py, configs/base.yaml,
+scripts/finetune_vae_decoder.py, scripts/sample.py, scripts/evaluate.py, scripts/train_seg.py, scripts/checkpoint_curve.py,
+synthmri/diffusion/train.py, scripts/run_experiments.sh, scripts/collect_results.py, scripts/queue_2026-09-10d.sh, tests/test_models.py,
+docs/EXPERIMENTS.md, docs/REPRODUCE.md, README.md
+Follow-ups: RESULTS.md sections for seg2, seg256, seg3 and the decoder study as each finishes
+
 ## 2026-09-10 -- 256 px model at the FID floor; segmentation study repeated at 256 px (queued)
 
 `ldm256_maskcond_reg` (dropout 0.1 + augment 6, best epoch ≈ 100): FID 10.45 / KID 6.4×10⁻³ vs the

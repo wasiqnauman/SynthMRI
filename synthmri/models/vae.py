@@ -8,6 +8,7 @@ that they have roughly unit variance, as in Rombach et al. (2022).
 from __future__ import annotations
 
 from contextlib import contextmanager
+from pathlib import Path
 from types import SimpleNamespace
 
 import torch
@@ -16,6 +17,7 @@ from torch import nn
 
 LATENT_CHANNELS = 4
 DOWNSAMPLE = 8
+DECODER_KEYS = ("decoder", "post_quant_conv")  # the parts a decoder fine-tune changes (synthmri.models.vae_finetune)
 
 
 @contextmanager
@@ -35,13 +37,33 @@ def cudnn_heuristics():
         torch.backends.cudnn.benchmark = prev
 
 
+def decoder_state_dict(vae: nn.Module) -> dict[str, torch.Tensor]:
+    """CPU copy of the ``decoder`` + ``post_quant_conv`` tensors of an AutoencoderKL-like module."""
+    return {k: v.detach().cpu().clone() for k, v in vae.state_dict().items() if k.split(".")[0] in DECODER_KEYS}
+
+
+def load_decoder_weights(vae: nn.Module, path: str | Path) -> int:
+    """Load a fine-tuned decoder saved by ``finetune_decoder`` (``decoder.pt``); returns the number of tensors."""
+    obj = torch.load(path, map_location="cpu", weights_only=True)
+    state = obj["state"] if isinstance(obj, dict) and "state" in obj else obj
+    expected = {k for k in vae.state_dict() if k.split(".")[0] in DECODER_KEYS}
+    missing, unexpected = expected - set(state), set(state) - expected
+    if missing or unexpected:
+        raise ValueError(f"{path} does not match this VAE's decoder: {len(missing)} missing, {len(unexpected)} unexpected tensors")
+    vae.load_state_dict(state, strict=False)
+    return len(state)
+
+
 class VAEWrapper(nn.Module):
-    def __init__(self, vae: nn.Module, scaling_factor: float | None = None):
+    def __init__(self, vae: nn.Module, scaling_factor: float | None = None, decoder_weights: str | Path | None = None):
         super().__init__()
         self.vae = vae
         self.scaling_factor = float(scaling_factor or vae.config.scaling_factor)
         self.downsample = DOWNSAMPLE
         self.latent_channels = LATENT_CHANNELS
+        self.decoder_weights = str(decoder_weights) if decoder_weights else None
+        if decoder_weights:
+            load_decoder_weights(vae, decoder_weights)
 
     @torch.no_grad()
     def encode_dist(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -69,15 +91,18 @@ class VAEWrapper(nn.Module):
         return self.decode(self.encode(x, sample=sample))
 
 
-def load_vae(pretrained: str = "stabilityai/sd-vae-ft-mse", device=None, dtype=torch.float32, scaling_factor=None) -> VAEWrapper:
+def load_vae(pretrained: str = "stabilityai/sd-vae-ft-mse", device=None, dtype=torch.float32, scaling_factor=None,
+             decoder_weights: str | Path | None = None) -> VAEWrapper:
+    """``decoder_weights``: optional ``decoder.pt`` from ``scripts/finetune_vae_decoder.py`` (encoder stays the pretrained one)."""
     from diffusers import AutoencoderKL
 
     vae = AutoencoderKL.from_pretrained(pretrained, torch_dtype=dtype)
     vae.requires_grad_(False)
     vae.eval()
+    wrapper = VAEWrapper(vae, scaling_factor, decoder_weights)
     if device is not None:
-        vae.to(device)
-    return VAEWrapper(vae, scaling_factor)
+        wrapper.to(device)
+    return wrapper
 
 
 class _Dist:
@@ -100,10 +125,18 @@ class DummyVAE(nn.Module):
     can check the plumbing without downloading weights.
     """
 
-    def __init__(self, in_channels: int = 3):
+    def __init__(self, in_channels: int = 3, trainable_decoder: bool = False):
         super().__init__()
         self.in_channels = in_channels
         self.config = SimpleNamespace(scaling_factor=1.0, latent_channels=LATENT_CHANNELS)
+        self.decoder = nn.Identity()
+        if trainable_decoder:  # identity-initialised 1x1 conv so decoder fine-tuning has something to train
+            self.post_quant_conv = nn.Conv2d(LATENT_CHANNELS, LATENT_CHANNELS, 1)
+            with torch.no_grad():
+                self.post_quant_conv.weight.copy_(torch.eye(LATENT_CHANNELS).view(LATENT_CHANNELS, LATENT_CHANNELS, 1, 1))
+                self.post_quant_conv.bias.zero_()
+        else:
+            self.post_quant_conv = nn.Identity()
 
     def encode(self, x: torch.Tensor):
         pooled = F.avg_pool2d(x, DOWNSAMPLE)
@@ -113,5 +146,6 @@ class DummyVAE(nn.Module):
         return SimpleNamespace(latent_dist=_Dist(mean, logvar))
 
     def decode(self, z: torch.Tensor):
+        z = self.decoder(self.post_quant_conv(z))
         x = F.interpolate(z[:, : self.in_channels], scale_factor=DOWNSAMPLE, mode="nearest")
         return SimpleNamespace(sample=x)

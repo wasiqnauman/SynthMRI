@@ -81,7 +81,7 @@ synthmri/
   diffusion/            latent caching, conditioning, schedulers, training loop, sampling, checkpoints
   eval/                 VAE reconstruction, FID/KID, diversity & memorisation, downstream segmentation
   utils/                seeding, I/O, logging, figures
-scripts/                preprocess / train / sample / evaluate / checkpoint_curve / train_seg / run_experiments.sh
+scripts/                preprocess / train / sample / evaluate / checkpoint_curve / train_seg / finetune_vae_decoder / run_experiments.sh
 configs/                base.yaml + experiment configs + smoke.yaml
 tests/                  pytest suite on a synthetic mini-BraTS (no downloads)
 splits/                 committed patient-level split

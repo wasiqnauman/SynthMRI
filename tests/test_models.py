@@ -92,3 +92,37 @@ def test_vae_wrapper_keeps_cudnn_benchmark_setting():
         assert torch.backends.cudnn.benchmark is True  # restored even on error
     finally:
         torch.backends.cudnn.benchmark = prev
+
+
+def test_decoder_finetune_and_reload(tmp_path, processed_dir):
+    """Fine-tuning trains only decoder parts, lowers the validation loss, and decoder.pt reloads into a fresh VAE."""
+    from synthmri.data.dataset import SliceDataset
+    from synthmri.models.vae import load_decoder_weights
+    from synthmri.models.vae_finetune import (
+        DecoderFinetuneConfig,
+        finetune_decoder,
+        trainable_decoder_parameters,
+    )
+
+    ds = SliceDataset(processed_dir, "train", hflip=False, return_mask=False)
+    vae = VAEWrapper(DummyVAE(trainable_decoder=True))
+    with torch.no_grad():  # perturb the decoder so there is something to recover
+        vae.vae.post_quant_conv.weight.add_(0.3)
+    x = torch.stack([ds[i]["image"] for i in range(min(4, len(ds)))])
+    z = vae.encode(x, sample=False)
+    err_before = (vae.decode(z) - x).abs().mean().item()
+    assert len(trainable_decoder_parameters(vae.vae)) == 2  # 1x1 conv weight + bias
+    cfg = DecoderFinetuneConfig(epochs=3, batch_size=2, lr=5e-2, lpips_weight=0.0, warmup_steps=1, num_workers=0)
+    info = finetune_decoder(vae, ds, ds, cfg, tmp_path / "dec", torch.device("cpu"))
+    assert (tmp_path / "dec" / "decoder.pt").exists() and (tmp_path / "dec" / "metrics.csv").exists()
+    assert info["history"][0]["epoch"] == 0 and info["best_val_loss"] < info["history"][0]["val_loss"]
+    assert (vae.decode(z) - x).abs().mean().item() < err_before
+    assert not any(p.requires_grad for p in vae.vae.parameters())
+
+    fresh = DummyVAE(trainable_decoder=True)
+    assert load_decoder_weights(fresh, tmp_path / "dec" / "decoder.pt") == 2
+    assert torch.allclose(fresh.post_quant_conv.weight, vae.vae.post_quant_conv.weight)
+    wrapped = VAEWrapper(DummyVAE(trainable_decoder=True), decoder_weights=tmp_path / "dec" / "decoder.pt")
+    assert torch.allclose(wrapped.decode(z), vae.decode(z))
+    with pytest.raises(ValueError):
+        load_decoder_weights(DummyVAE(), tmp_path / "dec" / "decoder.pt")  # no trainable decoder -> keys do not match

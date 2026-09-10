@@ -153,9 +153,29 @@ segmenter reading `data/processed/brats256` and the pool
 `collect_results.py` writes it as a second segmentation block and `make_figures.py` as
 `segmentation_dice_seg256.png`. Both resolutions are reported.
 
+### VAE decoder fine-tuning (declared 2026-09-10 11:50, after the seed-0 secondary results at 10 % and 25 % real and before any decoder was trained)
+
+The VAE-reconstructed-real control reproduces the loss on its own (seed 0: 10 % real 0.652 → 0.604,
+25 % real 0.708 → *pending*), i.e. the frozen natural-image decoder discards enhancing-tumour detail
+before the diffusion model is even involved. `scripts/finetune_vae_decoder.py` trains only
+`decoder` + `post_quant_conv` of `sd-vae-ft-mse` on the 128 px training slices (L1 + 0.5·LPIPS-VGG
+per channel, AdamW 2e-5, batch 16, 8 epochs, horizontal flips; the epoch with the lowest validation
+loss is kept). The encoder is untouched, so the cached latents and LDM-128-mask-reg stay valid: the
+same latents (same seed) are decoded again with the new decoder into
+`samples_best_ddim50_cfg2_seed0_ftdec` (20,000), the cfg-1 and validation-mask sets, and scored as
+before (`--vae_decoder`). The primary and secondary segmentation protocols are then repeated
+unchanged with that pool into `runs/seg_ftdec/`, with the VAE-reconstructed-real control also using
+the fine-tuned decoder. Pre-declared readings: (a) the test ceiling (PSNR / SSIM / LPIPS-Alex on the
+same test slices, before vs after) must improve, otherwise the study stops there; (b) the study
+supports the hypothesis "the loss is the decoder's" only if the VAE-reconstructed-real control moves
+towards real-only *and* real + synthetic moves in the same direction; a better ceiling with an
+unchanged segmentation result would attribute the loss to the diffusion model instead. The real
+pre-training control of `seg3` is decoder-independent and is not repeated.
+
 ## What would strengthen the paper further
 
 * A radiology-specific feature extractor (e.g. RadImageNet) for FID, alongside Inception.
 * 3-D or 2.5-D generation; the present models are per-slice and ignore inter-slice consistency.
-* Fine-tuning the VAE *decoder* (encoder frozen) with an L1 + LPIPS loss to raise the ceiling.
+* Fine-tuning the whole VAE (encoder included) or training a medical-image VAE, once the decoder
+  fine-tune above has been evaluated.
 * External validation of the segmenter on BraTS 2021 patients not in BraTS 2020.

@@ -129,7 +129,7 @@ def train(cfg: Config, vae: VAEWrapper | None = None) -> Path:
     )
 
     if vae is None:
-        vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor)
+        vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor, decoder_weights=cfg.model.vae.decoder_weights)
     else:
         vae = vae.to(device)
     train_ds, val_ds = _build_datasets(cfg, vae, device, logger)

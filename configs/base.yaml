@@ -19,6 +19,7 @@ model:
   vae:
     pretrained: stabilityai/sd-vae-ft-mse
     scaling_factor: null    # null -> use the VAE's own (0.18215)
+    decoder_weights: null   # optional decoder.pt from scripts/finetune_vae_decoder.py (only changes decoding)
   unet:
     block_out_channels: [128, 256, 512, 512]
     layers_per_block: 2
