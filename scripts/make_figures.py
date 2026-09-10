@@ -7,6 +7,7 @@
 * <run>_<samples>_real_vs_synth.png   real test slices vs generated slices, one column per modality
 * <run>_checkpoint_curve.png          loss / FID / memorisation per saved checkpoint (scripts/checkpoint_curve.py)
 * segmentation_dice.png               downstream Dice by real-data fraction, real vs real+synthetic
+* segmentation_dice_secondary.png     secondary analyses: 1:1 synthetic, synthetic pre-training, VAE-reconstructed real
 Missing inputs are skipped, so the script can be run at any point of the experiment set.
 """
 
@@ -153,28 +154,28 @@ def checkpoint_curve(run: Path, out: Path) -> None:
     plt.close(fig)
 
 
-def segmentation_figure(summary_json: Path, out: Path) -> None:
-    if not summary_json.exists():
-        return
-    seg = json.loads(summary_json.read_text()).get("segmentation", {})
+def _seg_bars(seg: dict, conditions: list[tuple[str, str]], filename: Path, synthetic_only_line: bool) -> None:
+    """Grouped bars: one group per real-data fraction, one bar per (label, key suffix) condition."""
     fracs = [k for k in ("10% real", "25% real", "100% real") if k in seg]
-    if not fracs:
+    conditions = [c for c in conditions if any(f + c[1] in seg for f in fracs)]
+    if not fracs or not conditions:
         return
     regions = ["WT", "TC", "ET"]
     fig, axes = plt.subplots(1, 3, figsize=(8.4, 2.7), dpi=200, sharey=True)
     x = np.arange(len(fracs))
-    w = 0.36
+    w = 0.76 / len(conditions)
     for ax, r in zip(axes, regions):
-        for j, (label, suffix, col) in enumerate((("real only", "", SERIES[0]), ("real + synthetic", " + synthetic", SERIES[1]))):
+        for j, (label, suffix) in enumerate(conditions):
             means = [seg.get(f + suffix, {}).get(r, {}).get("mean", np.nan) for f in fracs]
             stds = [seg.get(f + suffix, {}).get(r, {}).get("std", 0.0) for f in fracs]
-            bars = ax.bar(x + (j - 0.5) * w, means, w - 0.04, color=col, yerr=stds, error_kw={"elinewidth": 0.8, "ecolor": INK2, "capsize": 2}, label=label)
+            bars = ax.bar(x + (j - (len(conditions) - 1) / 2) * w, means, w - 0.03, color=SERIES[j], yerr=stds,
+                          error_kw={"elinewidth": 0.8, "ecolor": INK2, "capsize": 2}, label=label)
             for b, m_ in zip(bars, means):
                 if np.isfinite(m_):
-                    ax.text(b.get_x() + b.get_width() / 2, 0.02, f"{m_:.3f}", ha="center", va="bottom", fontsize=6, color="white", rotation=90)
-        if "synthetic only" in seg:
+                    ax.text(b.get_x() + b.get_width() / 2, 0.02, f"{m_:.3f}", ha="center", va="bottom", fontsize=5.5, color="white", rotation=90)
+        if synthetic_only_line and "synthetic only" in seg:
             v = seg["synthetic only"].get(r, {}).get("mean", np.nan)
-            ax.axhline(v, color=SERIES[2], linewidth=1.2, linestyle=(0, (4, 3)), label="synthetic only")
+            ax.axhline(v, color=INK2, linewidth=1.2, linestyle=(0, (4, 3)), label="synthetic only")
         ax.set_xticks(x)
         ax.set_xticklabels([f.replace(" real", "") for f in fracs])
         ax.set_title(f"{r} Dice", color=INK, fontsize=9, loc="left")
@@ -185,8 +186,17 @@ def segmentation_figure(summary_json: Path, out: Path) -> None:
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, frameon=False, fontsize=7, loc="lower center", ncol=len(labels), bbox_to_anchor=(0.5, -0.02))
     fig.tight_layout(rect=(0, 0.06, 1, 1))
-    fig.savefig(out / "segmentation_dice.png", bbox_inches="tight")
+    fig.savefig(filename, bbox_inches="tight")
     plt.close(fig)
+
+
+def segmentation_figure(summary_json: Path, out: Path) -> None:
+    if not summary_json.exists():
+        return
+    seg = json.loads(summary_json.read_text()).get("segmentation", {})
+    _seg_bars(seg, [("real only", ""), ("real + synthetic", " + synthetic")], out / "segmentation_dice.png", synthetic_only_line=True)
+    _seg_bars(seg, [("real only", ""), ("real + synthetic (1:1)", " + synthetic 1:1"), ("synthetic pre-training, then real", ", synthetic pre-training"),
+                    ("VAE-reconstructed real only", " (VAE-reconstructed)")], out / "segmentation_dice_secondary.png", synthetic_only_line=False)
 
 
 def main() -> None:

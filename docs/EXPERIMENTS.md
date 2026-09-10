@@ -116,6 +116,23 @@ The real-only segmenters are additionally scored on all 20,000 synthetic pairs (
 consistency": per-slice Dice between the segmenter's prediction on the generated image and the mask
 the image was conditioned on).
 
+### Secondary analyses (declared 2026-09-10 01:35, after the seed-0 results of the 10 % and 25 % conditions and before the remaining seeds finished)
+
+The first two real + synthetic runs lost Dice on TC and ET relative to real only, and the mask-
+consistency scores show that a real-trained segmenter finds ET in the synthetic images less often
+than in real ones. Three follow-up conditions, run with the same 3 seeds after the primary study,
+are meant to say *why*; the primary protocol above is unchanged and stays the headline result:
+
+| condition | flag | question |
+|---|---|---|
+| real + synthetic, 1:1 | `--synth_ratio 1.0` | does the harm come from synthetic slices outnumbering real ones (≈ 1.25:1 in the primary protocol)? |
+| synthetic pre-training, then real | `--pretrain_synthetic DIR --pretrain_epochs 20` | does the usual pre-train / fine-tune use of synthetic data help where mixing does not? |
+| VAE-reconstructed real only | `--real_through_vae` | how much of the gap is the frozen VAE's own loss of detail (PSNR 26 dB, SSIM 0.83), independent of the generator? Real slices are replaced by `decode(encode(x))`. |
+
+All three use the selected model's 20,000-sample pool with the same patient matching. Output
+directories `runs/seg/real<pct>_{synth1x,pre,vae}_s<seed>`; `collect_results.py` lists them after
+the primary rows and `make_figures.py` draws `segmentation_dice_secondary.png`.
+
 ## What would strengthen the paper further
 
 * A radiology-specific feature extractor (e.g. RadImageNet) for FID, alongside Inception.

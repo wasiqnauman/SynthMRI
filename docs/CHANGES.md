@@ -1,5 +1,26 @@
 # Work log
 
+## 2026-09-10 -- Secondary segmentation analyses declared and queued (1:1 synthetic, synthetic pre-training, VAE-reconstructed real)
+
+The first real + synthetic segmenters (seed 0, 10 % and 25 % real) score *below* real only on TC and
+ET (mean Dice 0.652 → 0.619 and 0.708 → 0.662), and the mask-consistency check shows a real-trained
+segmenter recovers ET from synthetic images less often than from real ones (per-slice ET Dice
+0.47–0.50 vs 0.55–0.64). Before the remaining seeds finished, three diagnostic conditions were
+declared in EXPERIMENTS.md and added to `scripts/train_seg.py`: `--synth_ratio` (cap synthetic at
+a multiple of the real slice count), `--pretrain_synthetic DIR --pretrain_epochs N` (train on
+synthetic alone, then fine-tune on real; `train_segmenter` gained `init_state`) and
+`--real_through_vae` (real training images replaced by their frozen-VAE reconstructions,
+`synthmri.eval.recon.vae_roundtrip`). `run_experiments.sh` gets a `seg2` stage for them and now
+defaults `SEG_SOURCE` to the run named in `results/model_selection.json`; `collect_results.py`
+groups the new runs as separate rows; `make_figures.py` draws `segmentation_dice_secondary.png`.
+The primary protocol is unchanged and remains the headline result. `scripts/queue_2026-09-10.sh`
+waits for the running overnight queue and then runs `seg2` + `collect` (~4 h).
+
+Files: scripts/train_seg.py, synthmri/eval/segmentation.py, synthmri/eval/recon.py, scripts/run_experiments.sh,
+scripts/queue_2026-09-10.sh, scripts/collect_results.py, scripts/make_figures.py, tests/test_eval.py,
+docs/EXPERIMENTS.md, docs/REPRODUCE.md
+Follow-ups: docs/RESULTS.md after both queues finish
+
 ## 2026-09-10 -- Candidate results and model selection: the regularised recipe wins
 
 All three 128 px mask-conditioned candidates finished (`runs/ldm128_maskcond{,_do01,_reg}`).

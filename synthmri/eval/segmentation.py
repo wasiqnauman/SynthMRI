@@ -122,9 +122,11 @@ def evaluate_segmenter(model, images, masks, patient_ids: np.ndarray, device, ba
 
 
 def train_segmenter(
-    train_images, train_masks, val_images, val_masks, val_patient_ids, cfg: SegConfig, out_dir: str | Path, device=None
+    train_images, train_masks, val_images, val_masks, val_patient_ids, cfg: SegConfig, out_dir: str | Path, device=None,
+    init_state: dict | None = None,
 ):
-    """Train and return (model, history); the best-val-Dice weights are restored at the end."""
+    """Train and return (model, history); the best-val-Dice weights are restored at the end.
+    ``init_state`` (a state dict) starts from previously trained weights, e.g. after synthetic pre-training."""
     from monai.losses import DiceCELoss
 
     out_dir = Path(out_dir)
@@ -134,6 +136,8 @@ def train_segmenter(
     logger = get_logger(f"synthmri.seg.{out_dir.name}", out_dir / "train.log")
     save_json(asdict(cfg), out_dir / "seg_config.json")
     model = build_seg_model(cfg).to(device)
+    if init_state is not None:
+        model.load_state_dict(init_state)
     ds = ArraySliceDataset(train_images, train_masks, hflip=cfg.hflip)
     loader = DataLoader(ds, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers, pin_memory=True, drop_last=True,
                         persistent_workers=cfg.num_workers > 0)

@@ -3,13 +3,13 @@
 # exist are skipped, so the script can be re-run after an interruption.
 #   bash scripts/run_experiments.sh                                          # everything
 #   STAGES="train sample eval curve" MODELS="ldm128_maskcond" bash scripts/run_experiments.sh
-#   STAGES="seg collect" bash scripts/run_experiments.sh                     # only the downstream study
+#   STAGES="seg seg2 collect" bash scripts/run_experiments.sh                # only the downstream study
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 PY="${PYTHON:-python}"
-STAGES="${STAGES:-preprocess train sample eval curve seg collect}"
+STAGES="${STAGES:-preprocess train sample eval curve seg seg2 collect}"
 MODELS="${MODELS:-ldm128_maskcond ldm128_maskcond_do01 ldm128_maskcond_reg ldm128_uncond ldm128_uncond_reg ldm256_maskcond_reg}"
 CKPT="${CKPT:-best}"                    # checkpoint behind every reported sample set (lowest validation loss)
 N_SAMPLES="${N_SAMPLES:-5000}"          # samples per model/setting for FID/KID etc.
@@ -17,8 +17,12 @@ N_SAMPLES_SEG="${N_SAMPLES_SEG:-20000}" # paired samples per mask-conditioned mo
 N_CURVE="${N_CURVE:-2000}"              # samples per checkpoint for the FID/memorisation curve
 SEEDS="${SEEDS:-0 1 2}"
 SEG_CFG="${SEG_CFG:-configs/ldm128_maskcond.yaml}"
-SEG_SOURCE="${SEG_SOURCE:-runs/ldm128_maskcond/samples_${CKPT}_ddim50_cfg2_seed0}"
 SEG_EPOCHS="${SEG_EPOCHS:-40}"
+PRETRAIN_EPOCHS="${PRETRAIN_EPOCHS:-20}"
+if [[ -z "${SEG_SOURCE:-}" ]]; then  # default: the model chosen by scripts/select_model.py, else the baseline
+  SEG_MODEL=$([[ -f results/model_selection.json ]] && $PY -c "import json; print(json.load(open('results/model_selection.json'))['chosen'])" || echo ldm128_maskcond)
+  SEG_SOURCE="runs/$SEG_MODEL/samples_${CKPT}_ddim50_cfg2_seed0"
+fi
 
 has() { [[ " $STAGES " == *" $1 "* ]]; }
 log() { echo "[$(date '+%F %T')] $*"; }
@@ -86,6 +90,18 @@ if has seg; then
     done
     log "seg synthetic-only seed $s"
     seg "runs/seg/synthonly_s$s" --seed "$s" --synthetic "$SEG_SOURCE" --synthetic_only
+  done
+fi
+
+if has seg2; then  # secondary analyses (docs/EXPERIMENTS.md): 1:1 synthetic, VAE-reconstructed real, synthetic pre-training
+  for s in $SEEDS; do
+    for frac in 0.1 0.25 1.0; do
+      tag=$(printf "real%03d" "$(awk "BEGIN{print int($frac*100+0.5)}")")
+      log "seg2 $tag seed $s"
+      seg "runs/seg/${tag}_synth1x_s$s" --real_fraction "$frac" --seed "$s" --synthetic "$SEG_SOURCE" --synth_ratio 1.0
+      seg "runs/seg/${tag}_vae_s$s" --real_fraction "$frac" --seed "$s" --real_through_vae
+      seg "runs/seg/${tag}_pre_s$s" --real_fraction "$frac" --seed "$s" --pretrain_synthetic "$SEG_SOURCE" --pretrain_epochs "$PRETRAIN_EPOCHS"
+    done
   done
 fi
 

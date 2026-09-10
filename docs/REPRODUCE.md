@@ -10,7 +10,7 @@ Everything below was run on one NVIDIA RTX A6000 (48 GB) with the package versio
 ```bash
 conda env create -f environment.yml && conda activate synthmri     # Python 3.11
 # or: python -m venv .venv && . .venv/bin/activate && pip install -r requirements-lock.txt && pip install -e .
-pytest                                                              # 44 CPU-only tests, ~1 min
+pytest                                                              # 45 CPU-only tests, ~1 min
 ```
 
 `pytest` needs no data or downloads; it runs on a generated mini-BraTS (`tests/conftest.py`).
@@ -69,6 +69,7 @@ already exist, so it can simply be re-launched after a fix. Approximate cost:
 | sample + evaluate | per mask model: 20,000 samples (training masks, g = 2), 5,000 (g = 1), 5,000 (validation masks, g = 2); per unconditional model 5,000; FID/KID, diversity, memorisation | ~1–2 h total |
 | checkpoint curve | 2,000 samples per saved checkpoint, FID vs val + memorisation | ~30 min per model |
 | segmentation study | 21 U-Nets × 40 epochs (3 seeds × {10 %, 25 %, 100 %} × {real, real + synthetic} + synthetic-only) | ~3–4 h |
+| secondary segmentation analyses (`seg2`) | 27 U-Nets (3 seeds × 3 fractions × {1:1 synthetic, synthetic pre-training, VAE-reconstructed real}) | ~4 h |
 | collect | tables + figures | seconds |
 
 ## 5. The same thing step by step

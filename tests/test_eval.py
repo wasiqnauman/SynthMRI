@@ -60,6 +60,11 @@ def test_train_segmenter_smoke(tmp_path):
     pids = np.array(["p1"] * 4 + ["p2"] * 4)
     cfg = SegConfig(epochs=1, batch_size=4, channels=(8, 16, 32), num_workers=0, amp=False, max_steps=2)
     model, hist = train_segmenter(images, masks, images, masks, pids, cfg, tmp_path / "seg", torch.device("cpu"))
+    # continue from previous weights (synthetic pre-training -> fine-tuning)
+    state = {k: v.clone() for k, v in model.state_dict().items()}
+    model2, _ = train_segmenter(images, masks, images, masks, pids, SegConfig(epochs=0, batch_size=4, channels=(8, 16, 32), num_workers=0, amp=False),
+                                tmp_path / "seg2", torch.device("cpu"), init_state=state)
+    assert all(torch.equal(model2.state_dict()[k], v) for k, v in state.items())  # no epochs -> the given weights come back
     assert len(hist) == 1 and (tmp_path / "seg" / "segmenter.pt").exists()
     ds = ArraySliceDataset(images, masks, hflip=True)
     assert ds[0]["image"].shape == (3, s, s) and ds[0]["mask"].dtype == torch.int64
@@ -101,3 +106,14 @@ def test_vae_reconstruction_metrics(processed_dir, tmp_path):
         assert 0 <= res["metrics"][key]["ssim"]["mean"] <= 1 and res["metrics"][key]["psnr"]["mean"] > 5
     save_reconstruction_examples(VAEWrapper(DummyVAE()), ds, tmp_path / "rec.png", [0, 1], device="cpu")
     assert (tmp_path / "rec.png").exists()
+
+
+def test_vae_roundtrip_control():
+    from synthmri.eval.recon import vae_roundtrip
+    from synthmri.models import DummyVAE, VAEWrapper
+
+    blocks = np.random.RandomState(0).rand(5, 3, 2, 2)
+    imgs = np.repeat(np.repeat(blocks, 8, axis=2), 8, axis=3).astype(np.float16)  # constant 8x8 blocks: lossless for DummyVAE
+    out = vae_roundtrip(imgs, VAEWrapper(DummyVAE(), scaling_factor=None), device="cpu", batch_size=2)
+    assert out.shape == imgs.shape and out.dtype == np.float16
+    assert np.allclose(out.astype(np.float32), imgs.astype(np.float32), atol=2e-3)

@@ -18,6 +18,20 @@ from synthmri.models.vae import VAEWrapper
 from synthmri.utils.io import image_grid, save_png
 
 
+@torch.no_grad()
+def vae_roundtrip(images, vae: VAEWrapper, device: torch.device | str = "cuda", batch_size: int = 64) -> np.ndarray:
+    """``decode(encode(x))`` (posterior mean) of ``(N,C,S,S)`` images in [0, 1]; returns float16 in [0, 1].
+    Used as a control in the segmentation study: real slices that carry only the detail the frozen
+    VAE can reproduce, i.e. the ceiling any latent-diffusion sample is subject to."""
+    vae = vae.to(device).eval()
+    out = []
+    for s in range(0, images.shape[0], batch_size):
+        x = torch.from_numpy(np.ascontiguousarray(images[s : s + batch_size]).astype(np.float32)).to(device) * 2 - 1
+        xr = vae.reconstruct(x, sample=False).clamp(-1, 1) / 2 + 0.5
+        out.append(xr.cpu().numpy().astype(np.float16))
+    return np.concatenate(out)
+
+
 def _lpips_model(device):
     try:
         import lpips

@@ -117,23 +117,49 @@ def checkpoint_tables(runs_dir: Path, selection_json: Path) -> tuple[list[str], 
     return lines, summary
 
 
+def seg_variant(r: dict) -> str:
+    """Secondary-analysis label of a segmentation run ("" for the primary protocol)."""
+    a = r["args"]
+    if r.get("real_through_vae") or a.get("real_through_vae"):
+        return "VAE-reconstructed real"
+    if a.get("pretrain_synthetic"):
+        return "synthetic pre-training"
+    if a.get("synth_ratio") is not None:
+        return f"synthetic {a['synth_ratio']:g}:1"
+    return ""
+
+
+def seg_name(key: tuple) -> str:
+    frac, synth, only, variant = key
+    if only:
+        return "synthetic only"
+    name = f"{frac:.0%} real"
+    if variant == "VAE-reconstructed real":
+        return f"{name} (VAE-reconstructed)"
+    if variant == "synthetic pre-training":
+        return f"{name}, synthetic pre-training"
+    if variant:
+        return f"{name} + {variant}"
+    return name + (" + synthetic" if synth else "")
+
+
 def segmentation_tables(runs_dir: Path) -> tuple[list[str], dict]:
     groups: dict[tuple, list[dict]] = defaultdict(list)
     for p in sorted(runs_dir.glob("seg/*/results.json")):
         r = json.loads(p.read_text())
         a = r["args"]
         # Patient-matched filtering makes the synthetic count seed-dependent, so it is reported, not grouped on.
-        key = (float(a.get("real_fraction", 1.0)), bool(a.get("synthetic")), bool(a.get("synthetic_only")))
+        key = (float(a.get("real_fraction", 1.0)), bool(a.get("synthetic")), bool(a.get("synthetic_only")), seg_variant(r))
         groups[key].append(r)
     if not groups:
         return [], {}
-    lines = ["## Downstream segmentation (per-patient Dice on held-out test patients, mean ± std over seeds)", "",
+    lines = ["## Downstream segmentation (per-patient Dice on held-out test patients, mean ± std over seeds; "
+             "rows after the primary protocol are the secondary analyses of EXPERIMENTS.md)", "",
              "| training data | real patients | real slices | synthetic slices | seeds | WT | TC | ET | mean |", "|---|---|---|---|---|---|---|---|---|"]
     summary = {}
-    for key in sorted(groups, key=lambda k: (k[2], k[0], k[1])):
-        frac, synth, only = key
+    for key in sorted(groups, key=lambda k: (k[2], k[0], k[3] != "", k[1], k[3])):
         rs = groups[key]
-        name = "synthetic only" if only else (f"{frac:.0%} real" + (" + synthetic" if synth else ""))
+        name = seg_name(key)
         vals = {r_: [r["test"]["patient"][r_]["mean"] for r in rs] for r_ in ("WT", "TC", "ET")}
         vals["mean"] = [r["test"]["mean_WT_TC_ET"] for r in rs]
         cells = " | ".join(fmt(float(np.mean(v)), float(np.std(v))) for v in vals.values())
@@ -151,9 +177,8 @@ def segmentation_tables(runs_dir: Path) -> tuple[list[str], dict]:
         lines += ["## Mask consistency of synthetic samples (per-slice Dice of a real-trained segmenter vs the conditioning mask, mean ± std over seeds)", "",
                   "| segmenter | n synthetic | WT | TC | ET |", "|---|---|---|---|---|"]
         summary["mask_consistency"] = {}
-        for key in sorted(cons, key=lambda k: (k[2], k[0], k[1])):
-            frac, synth, only = key
-            name = "synthetic only" if only else (f"{frac:.0%} real" + (" + synthetic" if synth else ""))
+        for key in sorted(cons, key=lambda k: (k[2], k[0], k[3] != "", k[1], k[3])):
+            name = seg_name(key)
             vals = {r_: [c["slice"][r_]["mean"] for c in cons[key]] for r_ in ("WT", "TC", "ET")}
             cells = " | ".join(fmt(float(np.mean(v)), float(np.std(v))) for v in vals.values())
             lines.append(f"| {name} | {cons[key][0]['n']} | {cells} |")
