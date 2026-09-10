@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from synthmri.data.dataset import LatentDataset
-from synthmri.diffusion.checkpoint import find_run_dir, load_run, resolve_unet_dir
+from synthmri.diffusion.checkpoint import find_run_dir, load_run, resolve_checkpoint, resolve_unet_dir
 from synthmri.diffusion.conditioning import mask_to_condition
 from synthmri.diffusion.latents import cache_latents
 from synthmri.diffusion.sample import LatentSampler
@@ -63,6 +63,15 @@ def test_train_end_to_end_cpu(tiny_cfg, conditioning):
     assert resolve_unet_dir(run).name == "unet_ema"
     cfg2, unet, unet_dir = load_run(run, use_ema=True)
     assert cfg2.model.conditioning == conditioning and unet.config.in_channels == (4 if conditioning == "none" else 9)
+    assert resolve_checkpoint(run) == (run / "best", "best")
+    assert resolve_checkpoint(run, "") == (run / "best", "best")
+    assert resolve_checkpoint(run, "final") == (run / "final", "final")
+    assert resolve_checkpoint(run / "final", "best") == (run / "final", "final")  # explicit dir wins
+    ep = sorted((run / "checkpoints").iterdir())[-1]
+    assert resolve_checkpoint(run, str(int(ep.name.split("_")[1]))) == (ep, f"ep{int(ep.name.split('_')[1]):04d}")
+    assert resolve_checkpoint(run, str(ep)) == (ep, ep.name)
+    with pytest.raises(FileNotFoundError):
+        resolve_checkpoint(run, "999")
     # resume from the epoch checkpoint for one more step
     ckpt = sorted((run / "checkpoints").iterdir())[-1]
     cfg3 = dataclasses.replace(cfg, train=dataclasses.replace(cfg.train, resume=str(ckpt), output_dir=str(run) + "_resumed", epochs=2, max_steps=None))

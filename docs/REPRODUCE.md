@@ -54,14 +54,15 @@ tmux new -d -s synthmri 'bash scripts/run_experiments.sh > runs/experiments.log 
 
 Stages, models, sample counts and seeds can be restricted through environment variables
 (`STAGES`, `MODELS`, `N_SAMPLES`, `N_SAMPLES_SEG`, `SEEDS`, `SEG_EPOCHS`, `PYTHON`); see the
-header of `scripts/run_experiments.sh`. The script is sequential and stops at the first error, so it
-can be re-launched with the remaining stages after a fix. Approximate cost:
+header of `scripts/run_experiments.sh`. The script is sequential, stops at the first error and skips
+stages whose outputs already exist, so it can simply be re-launched after a fix. Approximate cost:
 
 | stage | what | time |
 |---|---|---|
-| train `ldm128_maskcond`, `ldm128_uncond` | 200 epochs, 49.6k steps each | ~1.3 h each (23 s / epoch) |
+| train `ldm128_maskcond`, `ldm128_uncond`, `ldm128_maskcond_do01` | 200 epochs, 49.6k steps each | ~1.3 h each (23 s / epoch) |
 | train `ldm256_maskcond` | 200 epochs, 99.2k steps | ~5–6 h |
-| sample + evaluate | 5,000 samples per setting (20,000 for the segmentation pool), FID/KID, diversity, memorisation | ~1–2 h total |
+| sample + evaluate | 5,000 samples per setting from `best/` (20,000 for the segmentation pool), FID/KID, diversity, memorisation | ~1–2 h total |
+| checkpoint curve | 2,000 samples per saved checkpoint, FID vs val + memorisation | ~30 min per model |
 | segmentation study | 21 U-Nets × 40 epochs (3 seeds × {10 %, 25 %, 100 %} × {real, real + synthetic} + synthetic-only) | ~3–4 h |
 | collect | tables + figures | seconds |
 
@@ -69,12 +70,13 @@ can be re-launched with the remaining stages after a fix. Approximate cost:
 
 ```bash
 python scripts/train.py    --config configs/ldm128_maskcond.yaml                       # -> runs/ldm128_maskcond
-python scripts/sample.py   --run runs/ldm128_maskcond --num_images 5000 --guidance_scale 2.0
-#                                                     -> runs/ldm128_maskcond/samples_ddim50_cfg2_seed0
-python scripts/evaluate.py --run runs/ldm128_maskcond --samples runs/ldm128_maskcond/samples_ddim50_cfg2_seed0
-#                                                     -> .../samples_ddim50_cfg2_seed0/eval/{results.json,results.md,*.png}
+python scripts/sample.py   --run runs/ldm128_maskcond --num_images 5000 --guidance_scale 2.0   # --checkpoint best (default) | final | <epoch>
+#                                                     -> runs/ldm128_maskcond/samples_best_ddim50_cfg2_seed0
+python scripts/evaluate.py --run runs/ldm128_maskcond --samples runs/ldm128_maskcond/samples_best_ddim50_cfg2_seed0
+#                                                     -> .../samples_best_ddim50_cfg2_seed0/eval/{results.json,results.md,*.png}
+python scripts/checkpoint_curve.py --run runs/ldm128_maskcond   # -> runs/ldm128_maskcond/checkpoint_curve.json
 python scripts/train_seg.py --config configs/ldm128_maskcond.yaml --real_fraction 0.1 --seed 0 \
-    --synthetic runs/ldm128_maskcond/samples_ddim50_cfg2_seed0 --out runs/seg/real010_synth_s0
+    --synthetic runs/ldm128_maskcond/samples_best_ddim50_cfg2_seed0 --out runs/seg/real010_synth_s0
 python scripts/collect_results.py      # -> docs/results_tables.md, results/summary.json
 python scripts/make_figures.py         # -> docs/figures/*.png
 ```
@@ -95,6 +97,6 @@ InceptionV3 weights, which are downloaded on first use.
 ```bash
 python scripts/train.py    --config configs/smoke.yaml
 python scripts/sample.py   --run runs/smoke --num_images 16 --steps 10
-python scripts/evaluate.py --run runs/smoke --samples runs/smoke/samples_ddim10_cfg2_seed0 --max_real 64 --skip_fid
+python scripts/evaluate.py --run runs/smoke --samples runs/smoke/samples_best_ddim10_cfg2_seed0 --max_real 64 --skip_fid
 python scripts/train_seg.py --config configs/smoke.yaml --out runs/smoke/seg_real --real_fraction 0.05 --epochs 1 --max_steps 5 --batch_size 8
 ```

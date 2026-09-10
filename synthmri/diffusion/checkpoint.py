@@ -98,6 +98,32 @@ def resolve_unet_dir(path: str | Path, use_ema: bool = True) -> Path:
     raise FileNotFoundError(f"No U-Net weights found under {p}")
 
 
+def resolve_checkpoint(run: str | Path, name: str = "best") -> tuple[Path, str]:
+    """Map a run directory and a checkpoint name to ``(checkpoint_dir, tag)``.
+
+    ``name`` is ``"best"`` (lowest validation loss; the default used for every reported sample set),
+    ``"final"`` (last epoch), an epoch number such as ``"150"`` (looked up under ``checkpoints/`` and
+    ``checkpoints_keep/``) or an explicit directory. If ``run`` already is a checkpoint directory it
+    is returned unchanged with its own name as the tag.
+    """
+    run = Path(run)
+    name = name or "best"
+    if (run / "unet").exists() or (run / "unet_ema").exists() or (run / "config.json").exists():
+        return run, run.name
+    if name in ("best", "final"):
+        d, tag = run / name, name
+    elif name.isdigit():
+        tag = f"ep{int(name):04d}"
+        d = run / "checkpoints" / f"epoch_{int(name):04d}"
+        if not d.exists():
+            d = run / "checkpoints_keep" / f"epoch_{int(name):04d}"
+    else:
+        d, tag = Path(name), Path(name).name
+    if not d.exists():
+        raise FileNotFoundError(f"checkpoint {name!r} not found under {run}")
+    return d, tag
+
+
 def find_run_dir(path: str | Path) -> Path:
     """Walk up from ``path`` until a directory containing ``config.yaml`` is found."""
     p = Path(path).resolve()

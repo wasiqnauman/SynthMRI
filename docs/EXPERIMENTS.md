@@ -13,15 +13,34 @@ whole set; `scripts/collect_results.py` regenerates the tables.
 | LDM-128 | `configs/ldm128_uncond.yaml` | 128 | 16×16×4 | none | 64 | 200 | 49.6k |
 | LDM-128-mask | `configs/ldm128_maskcond.yaml` | 128 | 16×16×4 | tumour mask, p_drop = 0.1 | 64 | 200 | 49.6k |
 | LDM-256-mask | `configs/ldm256_maskcond.yaml` | 256 | 32×32×4 | tumour mask, p_drop = 0.1 | 32 | 200 | 99.2k |
+| LDM-128-mask-do0.1 (ablation) | `configs/ldm128_maskcond_do01.yaml` | 128 | 16×16×4 | as LDM-128-mask, U-Net dropout 0.1 | 64 | 200 | 49.6k |
 
 Shared: frozen `stabilityai/sd-vae-ft-mse`; U-Net channels (128, 256, 512, 512), 2 res-blocks per
 level, self-attention at levels 1–2; ε-prediction, linear β schedule, T = 1000; AdamW lr 1e-4,
 wd 0.01, 500 warm-up steps then cosine; grad-clip 1.0; EMA 0.9999 with warm-up; bf16; horizontal flips.
+Every 10th epoch is checkpointed and kept (`train.keep_checkpoints: 0`).
+
+## Checkpoint selection (early stopping on held-out patients)
+
+Every reported sample set comes from the EMA weights of the epoch with the **lowest validation
+diffusion loss** (`<run>/best/`, selected on the 37 validation patients, never on test), not from
+the last epoch. The validation loss is computed with fixed noise and timesteps spread evenly over
+[0, T) so it is comparable across epochs. Reason: on LDM-128-mask the validation loss reaches its
+minimum early (epoch 34) and then rises while the training loss keeps falling; later checkpoints
+obtain a *lower* FID, but `scripts/checkpoint_curve.py` shows they do so by reproducing training
+slices. The curve scores every saved checkpoint with the same 2,000 conditioning masks and seeds:
+FID/KID against the real validation slices and the nearest-training-slice distance of the samples,
+summarised as the fraction of samples that lie closer to a training slice than 95 % of real
+held-out slices do (≈ 0.05 for a model that generalises). `docs/figures/<run>_checkpoint_curve.png`
+plots loss, FID and that fraction against the epoch; the numbers are in `<run>/checkpoint_curve.json`.
+The dropout-0.1 ablation tests whether regularisation postpones the memorisation and improves the
+early-stopped model.
 
 ## Generation quality (`scripts/sample.py` + `scripts/evaluate.py`)
 
-5,000 samples per model and setting with DDIM, 50 steps, η = 0 (mask-conditioned: guidance scale
-2.0 and 1.0, masks drawn uniformly from the training split with random horizontal flips). The
+5,000 samples per model and setting from the `best/` weights with DDIM, 50 steps, η = 0
+(mask-conditioned: guidance scale 2.0 and 1.0, masks drawn uniformly from the training split with
+random horizontal flips); sample directories are named `samples_best_ddim50_cfg<g>_seed0`. The
 LDM-128-mask / guidance-2.0 set is generated with 20,000 samples; its first 5,000 are scored here and
 the whole set is the pool for the segmentation study below. Against all 4,623 real test slices:
 
@@ -45,8 +64,8 @@ patients; evaluation on real test patients with per-patient Dice for WT / TC / E
 | real 100 % | 258 | 15,895 | 0 / 20,000 | 0, 1, 2 |
 | synthetic only | 0 | 0 | 20,000 | 0, 1, 2 |
 
-The synthetic pool is the 20,000-sample LDM-128-mask set (guidance 2.0), each sample paired with the
-training mask it was conditioned on. The patient subset for a fraction is drawn with the run's seed
+The synthetic pool is the 20,000-sample LDM-128-mask set (`best/` weights, guidance 2.0), each sample
+paired with the training mask it was conditioned on. The patient subset for a fraction is drawn with the run's seed
 (`subsample_patients`). **Patient matching:** a real-x % segmenter only receives synthetic slices
 whose conditioning mask belongs to one of its own x % patients, so the low-data conditions never see
 tumour shapes from patients they do not have (otherwise the masks alone would leak information from

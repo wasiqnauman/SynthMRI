@@ -232,7 +232,7 @@ def train(cfg: Config, vae: VAEWrapper | None = None) -> Path:
         if (epoch + 1) % cfg.train.save_every == 0 or last:
             save_checkpoint(out / "checkpoints" / f"epoch_{epoch + 1:04d}", accelerator.unwrap_model(unet), ema, optimizer,
                             lr_scheduler, step=step, epoch=epoch, extra={"best_val": best_val})
-            prune_checkpoints(out / "checkpoints", keep_last=3)
+            prune_checkpoints(out / "checkpoints", keep_last=cfg.train.keep_checkpoints)
         if done:
             break
 

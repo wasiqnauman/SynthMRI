@@ -1,5 +1,28 @@
 # Work log
 
+## 2026-09-09 -- Early stopping on validation loss; checkpoint FID/memorisation curve; dropout ablation
+
+While LDM-128-mask was training, the validation diffusion loss bottomed out at epoch 34 and then
+rose steadily (0.075 → 0.131 by epoch 173) while the training loss kept falling. Scoring
+intermediate checkpoints (2,000 samples each, FID against real validation slices, nearest-training-
+slice distance) showed FID improving 29.9 → 25.0 → 21.8 → 20.9 (epochs 34 / 60 / 100 / 150) but the
+fraction of samples closer to a training slice than 95 % of real held-out slices growing
+0.06 → 0.26 → 0.71 → 0.90, i.e. later checkpoints improve FID by reproducing training slices.
+Changes: (1) `scripts/sample.py` gets `--checkpoint` (default `best` = lowest validation loss, EMA)
+and names sample directories `samples_<ckpt>_...`; `resolve_checkpoint()` added. (2) New
+`scripts/checkpoint_curve.py` scores every saved checkpoint (FID/KID vs val, memorisation vs train)
+into `<run>/checkpoint_curve.json`, plus a figure in `make_figures.py`. (3) `train.keep_checkpoints`
+(0 = keep all; base.yaml keeps every 10th epoch). (4) `scripts/run_experiments.sh` rewritten to be
+idempotent, sample from `best/`, and include the `curve` stage and the dropout-0.1 ablation
+`configs/ldm128_maskcond_do01.yaml`. Interim epoch-60/100 rows were saved into
+`runs/ldm128_maskcond/checkpoint_curve/` (the checkpoints were pruned before the script existed;
+noted in the rows). The queue was restarted with the new runner after the first model finished.
+
+Files: scripts/sample.py, scripts/checkpoint_curve.py, scripts/run_experiments.sh, scripts/make_figures.py,
+synthmri/diffusion/checkpoint.py, synthmri/diffusion/train.py, synthmri/config.py, configs/base.yaml,
+configs/ldm128_maskcond_do01.yaml, tests/test_diffusion.py, docs/EXPERIMENTS.md, docs/REPRODUCE.md, README.md
+Follow-ups: fill docs/RESULTS.md; decide from the ablation whether the uncond/256 models should also use dropout
+
 ## 2026-09-09 -- Stop cuDNN autotuning inside the VAE (18–36 GB transient spikes)
 
 With `cudnn.benchmark = True` (set by `seed_everything` for non-deterministic runs) the first VAE

@@ -5,6 +5,7 @@
 
 * <run>_loss.png                      training / validation diffusion loss per epoch
 * <run>_<samples>_real_vs_synth.png   real test slices vs generated slices, one column per modality
+* <run>_checkpoint_curve.png          loss / FID / memorisation per saved checkpoint (scripts/checkpoint_curve.py)
 * segmentation_dice.png               downstream Dice by real-data fraction, real vs real+synthetic
 Missing inputs are skipped, so the script can be run at any point of the experiment set.
 """
@@ -54,7 +55,7 @@ def loss_curves(run: Path, out: Path) -> None:
     ax.plot(ep["epoch"], ep["train_loss"], color=SERIES[0], linewidth=1.6)
     ax.plot(ep["epoch"], ep["val_loss"], color=SERIES[1], linewidth=1.6)
     ax.text(ep["epoch"].iloc[-1], ep["train_loss"].iloc[-1], "  train", color=SERIES[0], fontsize=8, va="center")
-    ax.text(ep["epoch"].iloc[-1], ep["val_loss"].iloc[-1], "  val (EMA)", color=SERIES[1], fontsize=8, va="center")
+    ax.text(ep["epoch"].iloc[-1], ep["val_loss"].iloc[-1], "  val", color=SERIES[1], fontsize=8, va="center")
     ax.set_xlabel("epoch", color=INK2, fontsize=8)
     ax.set_ylabel("diffusion MSE", color=INK2, fontsize=8)
     ax.set_title(run.name, color=INK, fontsize=9, loc="left")
@@ -96,6 +97,48 @@ def real_vs_synth(run: Path, samples: Path, out: Path, n: int = 4) -> None:
         axes[0, c].set_title(m.upper() if c < len(mods) else ("mask" if fake_m is not None else "real mask"), color=INK, fontsize=8)
     fig.subplots_adjust(wspace=0.04, hspace=0.04, left=0.06, right=0.99, top=0.95, bottom=0.01)
     fig.savefig(out / f"{run.name}_{samples.name}_real_vs_synth.png")
+    plt.close(fig)
+
+
+def checkpoint_curve(run: Path, out: Path) -> None:
+    """Losses, FID (vs real validation slices) and memorisation fraction per saved checkpoint."""
+    f = run / "checkpoint_curve.json"
+    if not f.exists():
+        return
+    d = json.loads(f.read_text())
+    rows = sorted((r for r in d["checkpoints"] if r.get("epoch") is not None), key=lambda r: r["epoch"])
+    if not rows:
+        return
+    ep = [r["epoch"] for r in rows]
+    fid = [r.get("fid_val", {}).get("fid", np.nan) for r in rows]
+    frac = [r["memorisation"]["frac_closer_than_val_p5"] for r in rows]
+    fig, axes = plt.subplots(1, 3, figsize=(8.4, 2.5), dpi=200)
+    losses = d.get("losses", [])
+    if losses:
+        le = [l_["epoch"] for l_ in losses]
+        axes[0].plot(le, [l_["train_loss"] for l_ in losses], color=SERIES[0], linewidth=1.4)
+        axes[0].plot(le, [l_["val_loss"] for l_ in losses], color=SERIES[1], linewidth=1.4)
+        axes[0].text(le[-1], losses[-1]["train_loss"], " train", color=SERIES[0], fontsize=7, va="center")
+        axes[0].text(le[-1], losses[-1]["val_loss"], " val", color=SERIES[1], fontsize=7, va="center")
+        axes[0].set_xlim(0, le[-1] * 1.15)
+    axes[0].set_title("diffusion loss", color=INK, fontsize=9, loc="left")
+    axes[1].plot(ep, fid, color=SERIES[0], linewidth=1.4, marker="o", markersize=3)
+    axes[1].set_title("FID vs real validation slices", color=INK, fontsize=9, loc="left")
+    axes[2].plot(ep, frac, color=SERIES[1], linewidth=1.4, marker="o", markersize=3)
+    axes[2].axhline(0.05, color=INK2, linewidth=0.8, linestyle=(0, (4, 3)))
+    axes[2].text(ep[0], 0.05, " real held-out level", color=INK2, fontsize=6.5, va="bottom")
+    axes[2].set_ylim(0, 1)
+    axes[2].set_title("samples nearer a training slice\nthan 95 % of held-out slices", color=INK, fontsize=8, loc="left")
+    for ax in axes:
+        if d.get("best_epoch"):
+            ax.axvline(d["best_epoch"], color=SERIES[2], linewidth=1.0, linestyle=(0, (4, 3)))
+        ax.set_xlabel("epoch", color=INK2, fontsize=8)
+        _style(ax)
+    if d.get("best_epoch"):
+        axes[1].text(d["best_epoch"], np.nanmax(fid), " lowest val loss", color=SERIES[2], fontsize=6.5, va="top")
+    fig.suptitle(run.name, color=INK, fontsize=9, x=0.01, ha="left")
+    fig.tight_layout()
+    fig.savefig(out / f"{run.name}_checkpoint_curve.png")
     plt.close(fig)
 
 
@@ -147,6 +190,7 @@ def main() -> None:
         if run.name == "smoke":
             continue
         loss_curves(run, out)
+        checkpoint_curve(run, out)
         for samples in sorted(run.glob("samples_*")):
             real_vs_synth(run, samples, out)
     segmentation_figure(Path(args.summary), out)

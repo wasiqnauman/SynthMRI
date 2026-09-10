@@ -84,6 +84,7 @@ class TrainConfig:
     val_every: int = 1  # epochs
     sample_every: int = 10  # epochs
     save_every: int = 10  # epochs
+    keep_checkpoints: int = 3  # rolling epoch checkpoints kept under checkpoints/; 0 = keep all
     num_sample_images: int = 16
     sample_steps: int = 50
     log_every: int = 50  # steps
@@ -94,7 +95,7 @@ class TrainConfig:
 
 @dataclass
 class SampleConfig:
-    checkpoint: str = ""  # run dir (uses final/EMA weights) or an explicit checkpoint dir
+    checkpoint: str = "best"  # "best" (lowest validation loss), "final", an epoch number or a checkpoint dir
     output_dir: str = ""  # default: <run>/samples
     num_images: int = 1000
     batch_size: int = 64

@@ -3,7 +3,10 @@
 
     python scripts/sample.py --run runs/ldm128_maskcond --num_images 2000 --steps 50 --guidance_scale 2.0
 
-Outputs (default ``<run>/samples_<sampler><steps>_cfg<g>_seed<s>/``): ``images.npy`` (N,3,S,S) float16
+By default the weights with the lowest validation loss (``<run>/best``, EMA) are used; ``--checkpoint final``
+or ``--checkpoint 150`` select the last epoch or a specific one.
+
+Outputs (default ``<run>/samples_<ckpt>_<sampler><steps>_cfg<g>_seed<s>/``): ``images.npy`` (N,3,S,S) float16
 in [0,1] with the run's modality order, ``masks.npy`` for mask-conditioned models, ``meta.csv``,
 ``preview.png`` and per-modality PNGs under ``png/`` for FID.
 """
@@ -19,8 +22,9 @@ import numpy as np
 import pandas as pd
 import torch
 
+from synthmri.config import load_config
 from synthmri.data.dataset import SliceDataset
-from synthmri.diffusion.checkpoint import find_run_dir, load_run
+from synthmri.diffusion.checkpoint import find_run_dir, load_run, resolve_checkpoint
 from synthmri.diffusion.conditioning import mask_to_condition
 from synthmri.diffusion.sample import LatentSampler
 from synthmri.eval.fidelity import export_pngs
@@ -32,6 +36,7 @@ from synthmri.utils.viz import save_sample_sheet
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--run", required=True, help="run directory (or checkpoint directory)")
+    p.add_argument("--checkpoint", default=None, help="'best' (default), 'final', an epoch number or a checkpoint dir")
     p.add_argument("--num_images", type=int, default=None)
     p.add_argument("--batch_size", type=int, default=None)
     p.add_argument("--sampler", choices=["ddim", "ddpm"], default=None)
@@ -46,8 +51,10 @@ def main() -> None:
     args = p.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    cfg, unet, unet_dir = load_run(args.run, use_ema=not args.no_ema, device=device)
     run_dir = find_run_dir(args.run)
+    ckpt_name = args.checkpoint or load_config(run_dir / "config.yaml").sample.checkpoint or "best"
+    ckpt_dir, ckpt_tag = resolve_checkpoint(args.run, ckpt_name)
+    cfg, unet, unet_dir = load_run(ckpt_dir, use_ema=not args.no_ema, device=device)
     s = cfg.sample
     num_images = args.num_images or s.num_images
     batch_size = args.batch_size or s.batch_size
@@ -60,7 +67,7 @@ def main() -> None:
     conditional = cfg.model.conditioning == "mask"
     if not conditional:
         guidance = 1.0
-    out = Path(args.output_dir) if args.output_dir else run_dir / f"samples_{sampler_name}{steps}_cfg{guidance:g}_seed{seed}"
+    out = Path(args.output_dir) if args.output_dir else run_dir / f"samples_{ckpt_tag}_{sampler_name}{steps}_cfg{guidance:g}_seed{seed}"
     out.mkdir(parents=True, exist_ok=True)
 
     vae = load_vae(cfg.model.vae.pretrained, device=device, scaling_factor=cfg.model.vae.scaling_factor)
@@ -103,7 +110,7 @@ def main() -> None:
         np.save(out / "masks.npy", np.concatenate(masks))
     pd.DataFrame(rows).to_csv(out / "meta.csv", index=False)
     save_json(
-        {"run": str(run_dir), "unet_dir": str(unet_dir), "num_images": num_images, "sampler": sampler_name, "steps": steps,
+        {"run": str(run_dir), "checkpoint": ckpt_tag, "unet_dir": str(unet_dir), "num_images": num_images, "sampler": sampler_name, "steps": steps,
          "guidance_scale": guidance, "eta": eta, "seed": seed, "use_ema": not args.no_ema, "mask_source": mask_source if conditional else None,
          "modalities": list(cfg.data.modalities), "seconds": time.time() - t0, "git_commit": git_commit_hash(), "argv": sys.argv},
         out / "sample_info.json",

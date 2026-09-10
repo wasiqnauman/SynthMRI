@@ -50,11 +50,12 @@ committed patient split `splits/brats2020_patient_splits.json` (258 / 37 / 74 pa
 export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0
 
 python scripts/train.py    --config configs/ldm128_maskcond.yaml          # or ldm128_uncond / ldm256_*
-python scripts/sample.py   --run runs/ldm128_maskcond --num_images 5000 --guidance_scale 2.0
-python scripts/evaluate.py --run runs/ldm128_maskcond --samples runs/ldm128_maskcond/samples_ddim50_cfg2_seed0
+python scripts/sample.py   --run runs/ldm128_maskcond --num_images 5000 --guidance_scale 2.0   # best-val-loss weights
+python scripts/evaluate.py --run runs/ldm128_maskcond --samples runs/ldm128_maskcond/samples_best_ddim50_cfg2_seed0
+python scripts/checkpoint_curve.py --run runs/ldm128_maskcond                                    # FID/memorisation per checkpoint
 python scripts/train_seg.py --config configs/ldm128_maskcond.yaml --out runs/seg/real100_s0            # real only
 python scripts/train_seg.py --config configs/ldm128_maskcond.yaml --real_fraction 0.1 \
-    --synthetic runs/ldm128_maskcond/samples_ddim50_cfg2_seed0 --n_synth 2000 --out runs/seg/real10_synth2000_s0
+    --synthetic runs/ldm128_maskcond/samples_best_ddim50_cfg2_seed0 --out runs/seg/real010_synth_s0
 ```
 
 Any config value can be overridden on the command line with dotted keys, e.g.
@@ -64,8 +65,8 @@ reproduces the full set of experiments in [docs/EXPERIMENTS.md](docs/EXPERIMENTS
 collected in [docs/RESULTS.md](docs/RESULTS.md).
 
 Each run directory contains `config.yaml`, `run_info.json` (git commit, versions), `metrics.csv`,
-TensorBoard logs (`tb/`), periodic sample sheets (`samples/`), rolling checkpoints, `best/` (lowest
-validation loss, EMA weights) and `final/`.
+TensorBoard logs (`tb/`), periodic sample sheets (`samples/`), epoch checkpoints, `best/` (lowest
+validation loss, EMA weights; the default for sampling, see `--checkpoint`) and `final/`.
 
 ## Repository layout
 
@@ -77,7 +78,7 @@ synthmri/
   diffusion/            latent caching, conditioning, schedulers, training loop, sampling, checkpoints
   eval/                 VAE reconstruction, FID/KID, diversity & memorisation, downstream segmentation
   utils/                seeding, I/O, logging, figures
-scripts/                preprocess / train / sample / evaluate / train_seg / run_experiments.sh
+scripts/                preprocess / train / sample / evaluate / checkpoint_curve / train_seg / run_experiments.sh
 configs/                base.yaml + experiment configs + smoke.yaml
 tests/                  pytest suite on a synthetic mini-BraTS (no downloads)
 splits/                 committed patient-level split
