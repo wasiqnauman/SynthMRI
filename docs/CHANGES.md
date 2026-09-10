@@ -1,5 +1,25 @@
 # Work log
 
+## 2026-09-10 -- Candidate results and model selection: the regularised recipe wins
+
+All three 128 px mask-conditioned candidates finished (`runs/ldm128_maskcond{,_do01,_reg}`).
+`scripts/select_model.py` (validation data only, rule in EXPERIMENTS.md) chose
+`ldm128_maskcond_reg`: FID vs validation slices at the best-val-loss checkpoint 24.65 (epoch 101)
+against 28.82 (do01, epoch 41) and 29.89 (baseline, epoch 34), with the lowest memorised fraction
+(0.049 vs 0.093 / 0.086). Against the real test slices its 5,000-sample set scores FID 20.85 (baseline
+26.22), 22.85 with unseen validation-patient masks (27.94), memorised 0.043 (0.069). Its checkpoint
+curve stays flat (0.115 memorised at epoch 200 vs 0.966 for the baseline), so augmentation, not
+dropout, is what postpones the memorisation; dropout alone behaves like the baseline. The
+segmentation study therefore uses `runs/ldm128_maskcond_reg/samples_best_ddim50_cfg2_seed0`, and
+the unconditional and 256 px models train with the `_reg` configs. Tables regenerated in
+`docs/results_tables.md`, selection in `results/model_selection.json`. Small tooling fixes on the
+way: the VAE-ceiling table is now one block per dataset instead of one per run, and the loss
+panels push the train/val end labels apart when the curves end close together.
+
+Files: scripts/collect_results.py, scripts/make_figures.py, docs/results_tables.md, results/summary.json,
+results/model_selection.json
+Follow-ups: docs/RESULTS.md once the segmentation study and the uncond / 256 px models finish
+
 ## 2026-09-09 -- Memorisation check now looks at training slices in both orientations
 
 The first in-repo checkpoint curve of LDM-128-mask disagreed with the interim rows: with

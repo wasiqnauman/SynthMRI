@@ -42,6 +42,19 @@ def _style(ax):
     ax.set_axisbelow(True)
 
 
+def _end_labels(ax, x, ys: list[float], names: list[str], colors: list[str], fontsize: float = 8) -> None:
+    """Direct labels at the right end of each curve, pushed apart when the end values nearly coincide."""
+    ymin, ymax = ax.get_ylim()
+    gap = 0.06 * (ymax - ymin)
+    order = np.argsort(ys)
+    pos = [float(v) for v in ys]
+    for a, b in zip(order[:-1], order[1:]):
+        if pos[b] - pos[a] < gap:
+            pos[b] = pos[a] + gap
+    for i, name in enumerate(names):
+        ax.text(x, pos[i], f" {name}", color=colors[i], fontsize=fontsize, va="center")
+
+
 def loss_curves(run: Path, out: Path) -> None:
     csv = run / "metrics.csv"
     if not csv.exists():
@@ -54,8 +67,7 @@ def loss_curves(run: Path, out: Path) -> None:
     fig, ax = plt.subplots(figsize=(4.2, 2.8), dpi=200)
     ax.plot(ep["epoch"], ep["train_loss"], color=SERIES[0], linewidth=1.6)
     ax.plot(ep["epoch"], ep["val_loss"], color=SERIES[1], linewidth=1.6)
-    ax.text(ep["epoch"].iloc[-1], ep["train_loss"].iloc[-1], "  train", color=SERIES[0], fontsize=8, va="center")
-    ax.text(ep["epoch"].iloc[-1], ep["val_loss"].iloc[-1], "  val", color=SERIES[1], fontsize=8, va="center")
+    _end_labels(ax, ep["epoch"].iloc[-1], [ep["train_loss"].iloc[-1], ep["val_loss"].iloc[-1]], ["train", "val"], SERIES[:2])
     ax.set_xlabel("epoch", color=INK2, fontsize=8)
     ax.set_ylabel("diffusion MSE", color=INK2, fontsize=8)
     ax.set_title(run.name, color=INK, fontsize=9, loc="left")
@@ -118,8 +130,7 @@ def checkpoint_curve(run: Path, out: Path) -> None:
         le = [l_["epoch"] for l_ in losses]
         axes[0].plot(le, [l_["train_loss"] for l_ in losses], color=SERIES[0], linewidth=1.4)
         axes[0].plot(le, [l_["val_loss"] for l_ in losses], color=SERIES[1], linewidth=1.4)
-        axes[0].text(le[-1], losses[-1]["train_loss"], " train", color=SERIES[0], fontsize=7, va="center")
-        axes[0].text(le[-1], losses[-1]["val_loss"], " val", color=SERIES[1], fontsize=7, va="center")
+        _end_labels(axes[0], le[-1], [losses[-1]["train_loss"], losses[-1]["val_loss"]], ["train", "val"], SERIES[:2], fontsize=7)
         axes[0].set_xlim(0, le[-1] * 1.15)
     axes[0].set_title("diffusion loss", color=INK, fontsize=9, loc="left")
     axes[1].plot(ep, fid, color=SERIES[0], linewidth=1.4, marker="o", markersize=3)

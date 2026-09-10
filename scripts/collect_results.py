@@ -16,6 +16,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
+import yaml
 
 EXCLUDE = {"smoke"}  # pipeline checks, never results
 
@@ -52,17 +53,22 @@ def generation_tables(runs_dir: Path) -> tuple[list[str], dict]:
         )
         summary[f"{run}/{tag}"] = {k: v for k, v in r.items() if k not in ("memorisation",)} | {"memorisation": {k: v for k, v in m.items() if k != "nn_index"}}
     lines.append("")
-    # VAE ceiling (one per run; identical for runs sharing data)
+    # VAE ceiling: depends only on the data (resolution), so one block per processed dataset
     seen = set()
-    vae_lines = ["## VAE reconstruction ceiling (real test slices)", "", "| run | channel | PSNR (dB) | SSIM | LPIPS |", "|---|---|---|---|---|"]
+    vae_lines = ["## VAE reconstruction ceiling (real test slices; frozen VAE, so it depends only on the data)", "",
+                 "| data | channel | PSNR (dB) | SSIM | LPIPS |", "|---|---|---|---|---|"]
     for p in rows:
         r = json.loads(p.read_text())
-        if "vae_reconstruction" not in r or p.parents[2].name in seen:
+        if "vae_reconstruction" not in r:
             continue
-        seen.add(p.parents[2].name)
+        cfg_file = p.parents[2] / "config.yaml"
+        data = Path(yaml.safe_load(cfg_file.read_text())["data"]["processed_dir"]).name if cfg_file.exists() else p.parents[2].name
+        if data in seen:
+            continue
+        seen.add(data)
         for k, mm in r["vae_reconstruction"]["metrics"].items():
             lp = mm.get("lpips", {}).get("mean", float("nan"))
-            vae_lines.append(f"| {p.parents[2].name} | {k} | {fmt(mm['psnr']['mean'], mm['psnr']['std'], 2)} | {fmt(mm['ssim']['mean'], mm['ssim']['std'])} | {lp:.3f} |")
+            vae_lines.append(f"| {data} ({p.parents[2].name}) | {k} | {fmt(mm['psnr']['mean'], mm['psnr']['std'], 2)} | {fmt(mm['ssim']['mean'], mm['ssim']['std'])} | {lp:.3f} |")
     if len(vae_lines) > 4:
         lines += vae_lines + [""]
     return lines, summary

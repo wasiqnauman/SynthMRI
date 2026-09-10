@@ -1,0 +1,30 @@
+{
+ "rule": "lowest FID vs validation slices at the best-val-loss checkpoint among runs with frac_memorised <= 0.15",
+ "candidates": [
+  {
+   "run": "ldm128_maskcond",
+   "best_epoch": 34,
+   "fid_val": 29.890354617517573,
+   "kid_val": 0.018184659481048585,
+   "frac_memorised": 0.0865,
+   "nn_dist_mean": 9.665644645690918
+  },
+  {
+   "run": "ldm128_maskcond_do01",
+   "best_epoch": 41,
+   "fid_val": 28.824722590533028,
+   "kid_val": 0.01724374771118164,
+   "frac_memorised": 0.0935,
+   "nn_dist_mean": 9.376701354980469
+  },
+  {
+   "run": "ldm128_maskcond_reg",
+   "best_epoch": 101,
+   "fid_val": 24.650222535556196,
+   "kid_val": 0.012864458560943603,
+   "frac_memorised": 0.049,
+   "nn_dist_mean": 10.686430931091309
+  }
+ ],
+ "chosen": "ldm128_maskcond_reg"
+}
