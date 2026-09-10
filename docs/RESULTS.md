@@ -50,6 +50,10 @@ slices; "memorised" = fraction of samples closer to a training slice (both orien
 of real held-out slices are. Figures: `figures/<run>_checkpoint_curve.png`
 (loss / FID / memorised fraction per epoch).
 
+![baseline checkpoint curve](figures/ldm128_maskcond_checkpoint_curve.png)
+![regularised checkpoint curve](figures/ldm128_maskcond_reg_checkpoint_curve.png)
+![256 px checkpoint curve](figures/ldm256_maskcond_reg_checkpoint_curve.png)
+
 | run | best epoch (val loss) | FID val at best | memorised at best | FID val at epoch 200 | memorised at epoch 200 |
 |---|---|---|---|---|---|
 | LDM-128-mask (baseline) | 34 | 29.89 | 0.086 | 21.81 | **0.966** |
@@ -86,6 +90,8 @@ floor: FID between real validation and real test slices = 10.49 (128 px) / 9.55 
 Pair-SSIM is the mean SSIM of 2,000 random sample pairs (lower = more diverse; real test slices
 0.652 / 0.690). Side-by-side sheets: `figures/<run>_<samples>_real_vs_synth.png`.
 
+![256 px real vs synthetic](figures/ldm256_maskcond_reg_samples_best_ddim50_cfg2_seed0_real_vs_synth.png)
+
 | model | setting | FID rgb ↓ | KID ×10³ ↓ | FID flair / t1ce / t2 | pair-SSIM | memorised ↓ |
 |---|---|---|---|---|---|---|
 | LDM-128-mask (baseline) | cfg 2 | 26.22 | 20.89 | 45.9 / 45.4 / 73.0 | 0.576 | 0.069 |
@@ -118,6 +124,8 @@ patients, 3 seeds. Synthetic slices come from LDM-128-mask-reg (`best/`, cfg 2) 
 patient-matched: a real-x % segmenter only receives synthetic slices conditioned on masks of its
 own x % patients. Figure: `figures/segmentation_dice.png`.
 
+![128 px segmentation](figures/segmentation_dice.png)
+
 | training data | real patients | real slices | synthetic slices | WT | TC | ET | mean |
 |---|---|---|---|---|---|---|---|
 | 10 % real | 26 | 1,483–1,705 | 0 | 0.801 ± 0.011 | 0.580 ± 0.023 | 0.509 ± 0.022 | 0.630 ± 0.016 |
@@ -149,6 +157,8 @@ enough to be usable, but not sharper than what 26 real patients provide.
 Declared in [EXPERIMENTS.md](EXPERIMENTS.md) after the first seed-0 results, run with the same 3 seeds,
 patient matching and 40-epoch schedule (`runs/seg/real<pct>_{synth1x,vae,pre}_s<seed>`).
 Figure: `figures/segmentation_dice_secondary.png`.
+
+![128 px secondary analyses](figures/segmentation_dice_secondary.png)
 
 | training data | WT | TC | ET | mean | Δ mean vs real only |
 |---|---|---|---|---|---|
@@ -191,6 +201,8 @@ Three answers to the questions posed in the declaration:
 Same protocol as section 4 (declared before any 256 px segmenter was trained) with the 256 px
 slices and the LDM-256-mask-reg pool (`runs/seg256/`, 21 U-Nets). Figure:
 `figures/segmentation_dice_seg256.png`.
+
+![256 px segmentation](figures/segmentation_dice_seg256.png)
 
 | training data | WT | TC | ET | mean | Δ mean vs real only |
 |---|---|---|---|---|---|

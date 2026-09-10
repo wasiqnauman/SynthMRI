@@ -1,5 +1,17 @@
 # Work log
 
+## 2026-09-10 -- Results PDF, README results-at-a-glance, figures embedded in RESULTS.md
+
+`scripts/make_report.py` renders `docs/RESULTS.md` (+ `docs/results_tables.md` as an appendix) to
+`docs/SynthMRI_results.pdf` with all referenced figures embedded (markdown → HTML → headless Chrome;
+10 pages, 1.7 MB). RESULTS.md now embeds the key figures inline so GitHub renders them; README gains
+a "Results at a glance" section, a status line and a documentation index. The user asked that the
+branch stay current for the collaborator after every milestone (code, small results, figures, a
+PDF), never large files.
+
+Files: scripts/make_report.py, docs/SynthMRI_results.pdf, docs/RESULTS.md, README.md, docs/REPRODUCE.md
+Follow-ups: rebuild the PDF after each results update (part of the milestone routine)
+
 ## 2026-09-10 -- 256 px segmentation study complete (3 seeds)
 
 `runs/seg256/` finished 18:26 (21 U-Nets, ~4.8 h instead of the estimated 12). Mean Dice vs real

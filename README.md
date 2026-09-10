@@ -19,6 +19,31 @@ BraTS 2020 3-D volumes ──preprocess──▶ 2-D tumour slices (patient-leve
                                             2-D U-Net segmenter: real vs real+synthetic (Dice WT/TC/ET)
 ```
 
+## Results at a glance (2026-09-10; full write-up in [docs/RESULTS.md](docs/RESULTS.md))
+
+* **Memorisation, not quality, limits training length.** The unregularised 128 px model copies 97 %
+  of its samples from training slices by epoch 200 while its FID keeps improving; every reported
+  number therefore comes from the lowest-validation-loss checkpoint, chosen on validation patients only.
+* **Affine latent augmentation (+ dropout) fixes it**: FID vs test 20.85 instead of 26.22 at 128 px,
+  memorised fraction 0.04. At 256 px the same recipe reaches FID 10.45, next to the 9.55 that two sets
+  of *real* slices score against each other.
+* **Downstream tumour segmentation (2-D U-Net, per-patient Dice, 3 seeds).** At 128 px, mixing
+  synthetic pairs into training hurts TC/ET; the frozen Stable Diffusion VAE alone reproduces that loss
+  (real slices passed through it lose 0.06–0.07 mean Dice), so the decoder's blur is the bottleneck.
+  At 256 px, where the VAE ceiling is 2.6 dB higher, synthetic data *helps* with 26 real patients
+  (+0.027 mean Dice, all regions, 3/3 seeds) and is neutral with more. Used for pre-training instead,
+  synthetic data helps at 128 px too (+0.044 at 10 % real; compute-matched control running).
+
+| ![checkpoint curve](docs/figures/ldm128_maskcond_checkpoint_curve.png) | ![256 px segmentation](docs/figures/segmentation_dice_seg256.png) |
+|---|---|
+| baseline: validation loss, FID and copied fraction per epoch | 256 px: Dice with and without synthetic slices |
+
+**Status.** Complete: all diffusion models, checkpoint curves, model selection, 128 px and 256 px
+segmentation studies, secondary analyses. Running (queued back to back, see
+[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) for the pre-declared protocols): the compute-matched
+pre-training control and the VAE-decoder fine-tune study. A PDF of the results with all figures is
+[docs/SynthMRI_results.pdf](docs/SynthMRI_results.pdf) (`python scripts/make_report.py`).
+
 ## Setup
 
 ```bash
@@ -71,6 +96,18 @@ Each run directory contains `config.yaml`, `run_info.json` (git commit, versions
 TensorBoard logs (`tb/`), periodic sample sheets (`samples/`), epoch checkpoints, `best/` (lowest
 validation loss, EMA weights; the default for sampling, see `--checkpoint`) and `final/`.
 
+## Documentation
+
+| file | contents |
+|---|---|
+| [docs/RESULTS.md](docs/RESULTS.md) | all results with interpretation; every number traceable to a run directory |
+| [docs/results_tables.md](docs/results_tables.md) | auto-generated tables (`scripts/collect_results.py`), also `results/summary.json` |
+| [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | protocol, model-selection rule, and the pre-declared follow-up studies with their reading rules |
+| [docs/REPRODUCE.md](docs/REPRODUCE.md) | commands, queue scripts and timings to reproduce everything on one GPU |
+| [docs/DATA.md](docs/DATA.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | preprocessing and dataset statistics; pipeline design decisions |
+| [docs/CHANGES.md](docs/CHANGES.md) | dated work log |
+| [docs/figures/](docs/figures) | every figure referenced above (PNG) |
+
 ## Repository layout
 
 ```
@@ -81,7 +118,8 @@ synthmri/
   diffusion/            latent caching, conditioning, schedulers, training loop, sampling, checkpoints
   eval/                 VAE reconstruction, FID/KID, diversity & memorisation, downstream segmentation
   utils/                seeding, I/O, logging, figures
-scripts/                preprocess / train / sample / evaluate / checkpoint_curve / train_seg / finetune_vae_decoder / run_experiments.sh
+scripts/                preprocess / train / sample / evaluate / checkpoint_curve / train_seg / finetune_vae_decoder /
+                        select_model / collect_results / make_figures / make_report / run_experiments.sh / queue_*.sh
 configs/                base.yaml + experiment configs + smoke.yaml
 tests/                  pytest suite on a synthetic mini-BraTS (no downloads)
 splits/                 committed patient-level split
@@ -91,7 +129,7 @@ notebooks/              legacy exploratory notebook (superseded by the package)
 
 ## Notes
 
-* Only one compute GPU is needed; a full 128-px run trains in about an hour on an RTX A6000.
+* Only one compute GPU is needed; a full 128-px run trains in 1.5 h on an RTX A6000 (256 px: 2.8 h).
 * The three modalities are mapped onto the VAE's RGB channels, so exactly three modalities are used.
   T1 is preprocessed and stored as well (`MODALITIES = (flair, t1, t1ce, t2)`) for future work.
 * `docs/CHANGES.md` is the dated work log for this repository.
