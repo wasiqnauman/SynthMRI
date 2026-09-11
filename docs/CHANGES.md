@@ -1,5 +1,17 @@
 # Work log
 
+## 2026-09-10 -- Decoder study: primary segmentation protocol with the re-decoded pool (3 seeds)
+
+`runs/seg_ftdec` primary protocol finished 22:51 (21 U-Nets, 2.2 h). With the fine-tuned decoder,
+mixing synthetic slices still costs Dice at every fraction: −0.020 / −0.033 / −0.012 mean (10 / 25 /
+100 % real) vs −0.031 / −0.036 / −0.021 with the frozen decoder; ET still −0.06 to −0.08. The
+re-trained real-only baselines reproduce section 4 within the seed spread. RESULTS.md 7.3 (primary
+part), README, figure `segmentation_dice_seg_ftdec.png` and the PDF updated; the secondary analyses
+(27 U-Nets) are running.
+
+Files: docs/RESULTS.md, README.md, docs/results_tables.md, results/summary.json, docs/figures/segmentation_dice_seg_ftdec.png, docs/SynthMRI_results.pdf
+Follow-ups: 7.3 secondary part (VAE control with the fine-tuned decoder decides reading b), ~2026-09-11 01:45
+
 ## 2026-09-10 -- VAE decoder fine-tuned; ceiling gate passed; samples re-decoded and scored
 
 `scripts/finetune_vae_decoder.py` ran as the first stage of the decoder study (queue7, 19:20–20:18):

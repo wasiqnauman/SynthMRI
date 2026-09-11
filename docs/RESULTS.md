@@ -6,11 +6,12 @@ which `scripts/collect_results.py` regenerates from the run directories under `r
 `best/` weights (lowest validation diffusion loss, EMA) and 5,000 DDIM-50 samples unless stated;
 segmentation Dice is per-patient on the 74 held-out test patients, mean ± std over 3 seeds.
 
-Status (2026-09-10 20:55): the diffusion models, the checkpoint curves, the model selection, the
+Status (2026-09-10 23:00): the diffusion models, the checkpoint curves, the model selection, the
 128 px segmentation study with its secondary analyses and the pre-training control, and the 256 px
 segmentation study are complete. The pre-declared VAE decoder fine-tune study (section 7) is
 running: the decoder is trained and its ceiling measured (7.1), the re-decoded samples are scored
-(7.2); the repeated segmentation study (7.3, 48 U-Nets, ≈ 8 h) is marked *pending*.
+(7.2) and the primary segmentation protocol is repeated (7.3); its secondary analyses (27 U-Nets,
+≈ 3 h) are marked *pending*.
 
 ## Headline findings
 
@@ -225,7 +226,7 @@ finding that the decoder's loss of detail, not the diffusion model, was limiting
 Note that the 256 px real-only segmenters are themselves stronger (0.709 / 0.764 / 0.804 vs
 0.630 / 0.711 / 0.778), so the two resolutions are compared only within themselves.
 
-## 7. VAE decoder fine-tuning (running: 7.1–7.2 done, 7.3 *pending*)
+## 7. VAE decoder fine-tuning (running: 7.1–7.2 and the primary part of 7.3 done, secondary *pending*)
 
 Declared after section 5's VAE control (protocol and pre-declared readings in
 [EXPERIMENTS.md](EXPERIMENTS.md)). Only `decoder` + `post_quant_conv` of `sd-vae-ft-mse` (49.5 M
@@ -282,10 +283,35 @@ that real held-out slices score by construction.
 
 ![same latents, frozen vs fine-tuned decoder](figures/ldm128_maskcond_reg_samples_best_ddim50_cfg2_seed0_ftdec_frozen_vs_finetuned.png)
 
-### 7.3 Segmentation with the re-decoded pool (*pending*, pre-declared reading b)
+### 7.3 Segmentation with the re-decoded pool (pre-declared reading b)
 
-Primary and secondary protocols repeated unchanged into `runs/seg_ftdec/` (48 U-Nets), with the
-VAE-reconstructed-real control also using the fine-tuned decoder.
+The primary protocol of section 4 was repeated unchanged with the re-decoded pool (`runs/seg_ftdec`,
+same seeds and patient-matched pairs). The real-only segmenters were re-trained too and reproduce
+section 4 within the seed spread (0.628 / 0.714 / 0.776 vs 0.630 / 0.711 / 0.778 mean Dice), which
+calibrates the run-to-run noise of everything below.
+
+| real patients | decoder | real only | + synthetic | Δ mean (seed-matched) | Δ WT / TC / ET |
+|---|---|---|---|---|---|
+| 26 (10 %) | frozen | 0.630 ± 0.016 | 0.600 ± 0.014 | −0.031 (−0.033, −0.020, −0.039) | +0.008 / −0.020 / −0.079 |
+| | fine-tuned | 0.628 ± 0.017 | 0.609 ± 0.006 | **−0.020** (−0.036, −0.005, −0.019) | +0.006 / −0.001 / −0.064 |
+| 64 (25 %) | frozen | 0.711 ± 0.004 | 0.675 ± 0.012 | −0.036 (−0.046, −0.027, −0.037) | −0.004 / −0.016 / −0.089 |
+| | fine-tuned | 0.714 ± 0.005 | 0.681 ± 0.007 | **−0.033** (−0.040, −0.031, −0.028) | −0.003 / −0.014 / −0.081 |
+| 258 (100 %) | frozen | 0.778 ± 0.003 | 0.757 ± 0.006 | −0.021 (−0.021, −0.032, −0.011) | −0.007 / −0.033 / −0.024 |
+| | fine-tuned | 0.776 ± 0.002 | 0.765 ± 0.004 | **−0.012** (−0.018, −0.009, −0.007) | −0.002 / −0.011 / −0.022 |
+| synthetic only | frozen | – | 0.660 ± 0.005 | | |
+| | fine-tuned | – | 0.672 ± 0.004 | | |
+
+The sharper decoding removes about a third of the loss at 10 % and 100 % real (−0.031 → −0.020,
+−0.021 → −0.012) and almost none at 25 % (−0.036 → −0.033). The loss stays negative in 9 of 9
+seed-matched pairs and enhancing tumour still loses 0.06–0.08 Dice; tumour core is what recovers
+(10 %: −0.020 → −0.001; 100 %: −0.033 → −0.011). A segmenter trained on the re-decoded synthetic
+slices alone reaches 0.672 mean Dice (0.660 with the frozen decoding), still the level of 10 %
+real data. So the decoder's blur was part of the problem but not most of it. The encoder is
+unchanged, so whether the remaining loss is the latent bottleneck's (detail the 16 × 16 × 4 latent
+never held, which no decoder can restore) or the diffusion model's is what the secondary study's
+VAE-reconstructed-real control with the fine-tuned decoder decides (*pending*, 27 U-Nets, ≈ 01:45).
+
+![128 px segmentation with the fine-tuned decoder](figures/segmentation_dice_seg_ftdec.png)
 
 ## 8. Compute-matched control for synthetic pre-training
 
