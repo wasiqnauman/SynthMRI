@@ -1,6 +1,6 @@
 # Work log
 
-## 2026-09-10 -- VAE decoder fine-tuned; ceiling gate passed; decoder figure
+## 2026-09-10 -- VAE decoder fine-tuned; ceiling gate passed; samples re-decoded and scored
 
 `scripts/finetune_vae_decoder.py` ran as the first stage of the decoder study (queue7, 19:20–20:18):
 the test-slice reconstruction ceiling of `sd-vae-ft-mse` at 128 px rises from PSNR 26.37 / SSIM
@@ -8,11 +8,15 @@ the test-slice reconstruction ceiling of `sd-vae-ft-mse` at 128 px rises from PS
 pre-declared "ceiling must improve" gate is passed and the queue went on to re-decode the sample
 sets (then 48 segmentation U-Nets into `runs/seg_ftdec`). `scripts/make_figures.py` gains
 `vae_decoder_<data>.png` (real test slices through the frozen vs the fine-tuned decoder, CPU) and
-RESULTS.md section 7.1 reports the ceiling; 7.2 / 7.3 stay *pending*. `decoder.pt` (189 MB) lives
-under the git-ignored `runs/`.
+and `<run>_<samples>_ftdec_frozen_vs_finetuned.png` (the same latents through both decoders; for
+`_ftdec` sample dirs this replaces the real-vs-synthetic figure). Re-decoding the three 128 px
+sample sets (20:18–20:41) leaves the composite FID unchanged (20.85 → 20.89) but cuts the
+per-modality FIDs by 35–75 % (T2 69.6 → 17.6, T1ce 44.0 → 25.6, FLAIR 44.3 → 28.6); memorised
+fraction 0.043 → 0.051 with identical latents. RESULTS.md sections 7.1–7.2 written, 7.3
+(segmentation) stays *pending*; PDF rebuilt. `decoder.pt` (189 MB) lives under the git-ignored `runs/`.
 
-Files: scripts/make_figures.py, docs/figures/vae_decoder_brats128.png, docs/RESULTS.md, docs/results_tables.md, results/summary.json
-Follow-ups: sections 7.2 (re-decoded sample scores, ~21:15) and 7.3 (segmentation, ~2026-09-11 05:00)
+Files: scripts/make_figures.py, docs/figures/vae_decoder_brats128.png, docs/figures/*_ftdec_frozen_vs_finetuned.png, docs/RESULTS.md, docs/results_tables.md, results/summary.json, README.md, docs/REPRODUCE.md, docs/SynthMRI_results.pdf
+Follow-ups: section 7.3 when `runs/seg_ftdec` finishes (~2026-09-11 05:00)
 
 ## 2026-09-10 -- Pre-training control complete (3 seeds)
 

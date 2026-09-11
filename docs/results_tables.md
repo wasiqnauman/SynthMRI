@@ -11,8 +11,11 @@
 | ldm128_maskcond_do01 | samples_best_ddim50_cfg2_seed0 | 24.34 | 19.13 | 47.65 | 46.20 | 75.71 | 10.49 | 0.585 / 0.652 | 9.40 / 9.96 | 0.070 |
 | ldm128_maskcond_do01 | samples_best_ddim50_cfg2_seed0_valmasks | 25.55 | 19.34 | 48.79 | 45.48 | 77.51 | 10.49 | 0.586 / 0.652 | 9.43 / 9.96 | 0.087 |
 | ldm128_maskcond_reg | samples_best_ddim50_cfg1_seed0 | 20.37 | 14.74 | 46.95 | 44.23 | 69.37 | 10.49 | 0.586 / 0.652 | 10.60 / 9.96 | 0.036 |
+| ldm128_maskcond_reg | samples_best_ddim50_cfg1_seed0_ftdec | 18.06 | 14.56 | 26.81 | 25.73 | 17.50 | 10.49 | 0.638 / 0.652 | 10.46 / 9.96 | 0.040 |
 | ldm128_maskcond_reg | samples_best_ddim50_cfg2_seed0 | 20.85 | 15.19 | 44.33 | 43.97 | 69.57 | 10.49 | 0.584 / 0.652 | 10.71 / 9.96 | 0.043 |
+| ldm128_maskcond_reg | samples_best_ddim50_cfg2_seed0_ftdec | 20.89 | 18.91 | 28.61 | 25.62 | 17.57 | 10.49 | 0.636 / 0.652 | 10.49 / 9.96 | 0.051 |
 | ldm128_maskcond_reg | samples_best_ddim50_cfg2_seed0_valmasks | 22.85 | 16.52 | 45.20 | 44.06 | 71.12 | 10.49 | 0.593 / 0.652 | 11.09 / 9.96 | 0.040 |
+| ldm128_maskcond_reg | samples_best_ddim50_cfg2_seed0_valmasks_ftdec | 22.49 | 20.21 | 29.34 | 26.66 | 17.91 | 10.49 | 0.640 / 0.652 | 10.90 / 9.96 | 0.046 |
 | ldm128_uncond_reg | samples_best_ddim50_cfg1_seed0 | 21.31 | 15.87 | 47.54 | 45.00 | 68.68 | 10.49 | 0.579 / 0.652 | 11.20 / 9.96 | 0.027 |
 | ldm256_maskcond_reg | samples_best_ddim50_cfg1_seed0 | 12.83 | 8.77 | 43.14 | 41.72 | 58.23 | 9.55 | 0.637 / 0.690 | 10.93 / 9.90 | 0.021 |
 | ldm256_maskcond_reg | samples_best_ddim50_cfg2_seed0 | 10.45 | 6.40 | 40.29 | 39.64 | 59.07 | 9.55 | 0.628 / 0.690 | 11.03 / 9.90 | 0.030 |
@@ -26,6 +29,10 @@
 | brats128 (ldm128_maskcond) | frozen | t1ce | 27.17 ± 1.96 | 0.842 ± 0.046 | 0.072 |
 | brats128 (ldm128_maskcond) | frozen | t2 | 25.39 ± 2.28 | 0.817 ± 0.049 | 0.078 |
 | brats128 (ldm128_maskcond) | frozen | rgb | 26.37 ± 1.92 | 0.833 ± 0.046 | 0.041 |
+| brats128 (ldm128_maskcond_reg) | fine-tuned (`vae_dec_brats128`) | flair | 28.56 ± 2.02 | 0.888 ± 0.033 | 0.057 |
+| brats128 (ldm128_maskcond_reg) | fine-tuned (`vae_dec_brats128`) | t1ce | 28.35 ± 1.94 | 0.882 ± 0.032 | 0.063 |
+| brats128 (ldm128_maskcond_reg) | fine-tuned (`vae_dec_brats128`) | t2 | 27.00 ± 2.33 | 0.880 ± 0.030 | 0.065 |
+| brats128 (ldm128_maskcond_reg) | fine-tuned (`vae_dec_brats128`) | rgb | 27.79 ± 1.85 | 0.883 ± 0.030 | 0.032 |
 | brats256 (ldm256_maskcond_reg) | frozen | flair | 29.65 ± 1.84 | 0.882 ± 0.035 | 0.066 |
 | brats256 (ldm256_maskcond_reg) | frozen | t1ce | 29.76 ± 1.85 | 0.885 ± 0.032 | 0.064 |
 | brats256 (ldm256_maskcond_reg) | frozen | t2 | 27.95 ± 2.06 | 0.863 ± 0.035 | 0.077 |

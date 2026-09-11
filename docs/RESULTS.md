@@ -6,11 +6,11 @@ which `scripts/collect_results.py` regenerates from the run directories under `r
 `best/` weights (lowest validation diffusion loss, EMA) and 5,000 DDIM-50 samples unless stated;
 segmentation Dice is per-patient on the 74 held-out test patients, mean ± std over 3 seeds.
 
-Status (2026-09-10 20:30): the diffusion models, the checkpoint curves, the model selection, the
+Status (2026-09-10 20:55): the diffusion models, the checkpoint curves, the model selection, the
 128 px segmentation study with its secondary analyses and the pre-training control, and the 256 px
 segmentation study are complete. The pre-declared VAE decoder fine-tune study (section 7) is
-running: the decoder is trained and its ceiling measured (7.1); the re-decoded sample scores (7.2)
-and the repeated segmentation study (7.3, ≈ 8 h) are marked *pending*.
+running: the decoder is trained and its ceiling measured (7.1), the re-decoded samples are scored
+(7.2); the repeated segmentation study (7.3, 48 U-Nets, ≈ 8 h) is marked *pending*.
 
 ## Headline findings
 
@@ -225,7 +225,7 @@ finding that the decoder's loss of detail, not the diffusion model, was limiting
 Note that the 256 px real-only segmenters are themselves stronger (0.709 / 0.764 / 0.804 vs
 0.630 / 0.711 / 0.778), so the two resolutions are compared only within themselves.
 
-## 7. VAE decoder fine-tuning (running: 7.1 done, 7.2–7.3 *pending*)
+## 7. VAE decoder fine-tuning (running: 7.1–7.2 done, 7.3 *pending*)
 
 Declared after section 5's VAE control (protocol and pre-declared readings in
 [EXPERIMENTS.md](EXPERIMENTS.md)). Only `decoder` + `post_quant_conv` of `sd-vae-ft-mse` (49.5 M
@@ -251,10 +251,36 @@ T1ce come out sharper.
 
 ![frozen vs fine-tuned decoder](figures/vae_decoder_brats128.png)
 
-### 7.2 Re-decoded samples (*pending*)
+### 7.2 The same samples decoded with the fine-tuned decoder
 
 The 20,000 training-mask, 5,000 g = 1 and 5,000 validation-mask sample sets of LDM-128-mask-reg
-are decoded again with the fine-tuned decoder (`samples_*_ftdec`) and scored as in section 3.
+were decoded again from the *same* latents (`samples_*_ftdec`) and scored as in section 3 (5,000
+samples per score). FID/KID rgb score the FLAIR/T1ce/T2 stack as one colour image; the per-modality
+FIDs score each grey channel on its own.
+
+| sample set | decoder | FID rgb ↓ | KID rgb ×10³ ↓ | FID FLAIR / T1ce / T2 ↓ | pair-SSIM (real pairs 0.652) | NN dist to train (real test 9.96) | memorised ↓ |
+|---|---|---|---|---|---|---|---|
+| training masks, g = 2 | frozen | 20.85 | 15.19 | 44.3 / 44.0 / 69.6 | 0.584 | 10.71 | 0.043 |
+| | fine-tuned | 20.89 | 18.91 | **28.6 / 25.6 / 17.6** | 0.636 | 10.49 | 0.051 |
+| training masks, g = 1 | frozen | 20.37 | 14.74 | 47.0 / 44.2 / 69.4 | 0.586 | 10.60 | 0.036 |
+| | fine-tuned | 18.06 | 14.56 | **26.8 / 25.7 / 17.5** | 0.638 | 10.46 | 0.040 |
+| validation masks, g = 2 | frozen | 22.85 | 16.52 | 45.2 / 44.1 / 71.1 | 0.593 | 11.09 | 0.040 |
+| | fine-tuned | 22.49 | 20.21 | **29.3 / 26.7 / 17.9** | 0.640 | 10.90 | 0.046 |
+
+The composite FID hardly moves (20.85 → 20.89, 20.37 → 18.06, 22.85 → 22.49) and KID rgb gets
+slightly worse for two sets, but the per-modality FIDs fall by 35–75 %: T2 69.6 → 17.6, T1ce
+44.0 → 25.6, FLAIR 44.3 → 28.6. The frozen decoder's per-channel scores were dominated by the
+texture it invents (compare the T2 columns in the figure below), which the composite metric, seeing
+the three channels as one colour image, largely ignores; the per-modality numbers are the ones a
+radiologist would recognise. Sample diversity moves towards that of real slices (pairwise SSIM
+0.584 → 0.636 vs 0.652 for real pairs), so part of the frozen decoding's apparent diversity was
+decoder noise. The samples also come slightly closer to the training set (mean nearest-neighbour
+distance 10.71 → 10.49; real held-out slices 9.96) and the memorised fraction rises from 0.043 to
+0.051 with the threshold unchanged. The latents are identical, so this is the sharper decoding
+moving every sample closer to every real slice, not new copying; the fraction stays at the 0.05
+that real held-out slices score by construction.
+
+![same latents, frozen vs fine-tuned decoder](figures/ldm128_maskcond_reg_samples_best_ddim50_cfg2_seed0_ftdec_frozen_vs_finetuned.png)
 
 ### 7.3 Segmentation with the re-decoded pool (*pending*, pre-declared reading b)
 

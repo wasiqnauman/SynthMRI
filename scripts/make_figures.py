@@ -9,6 +9,7 @@
 * segmentation_dice[_<dir>].png       downstream Dice by real-data fraction, real vs real+synthetic (one per runs/seg* study)
 * segmentation_dice[_<dir>]_secondary.png  secondary analyses: 1:1 synthetic, synthetic pre-training, VAE-reconstructed real
 * vae_decoder_<data>.png              test slices through the frozen vs the fine-tuned VAE decoder (runs/vae_dec_*/decoder.pt)
+* <run>_<samples>_ftdec_frozen_vs_finetuned.png  the same latent samples decoded with the frozen and the fine-tuned decoder
 Missing inputs are skipped, so the script can be run at any point of the experiment set.
 """
 
@@ -112,6 +113,39 @@ def real_vs_synth(run: Path, samples: Path, out: Path, n: int = 4) -> None:
         axes[0, c].set_title(m.upper() if c < len(mods) else ("mask" if fake_m is not None else "real mask"), color=INK, fontsize=8)
     fig.subplots_adjust(wspace=0.04, hspace=0.04, left=0.06, right=0.99, top=0.95, bottom=0.01)
     fig.savefig(out / f"{run.name}_{samples.name}_real_vs_synth.png")
+    plt.close(fig)
+
+
+def frozen_vs_finetuned(run: Path, samples_ftdec: Path, out: Path, n: int = 3) -> None:
+    """Rows = generated slices (same latents); columns = modality x {frozen decoder, fine-tuned decoder} + mask."""
+    frozen = samples_ftdec.with_name(samples_ftdec.name[: -len("_ftdec")])
+    if not (samples_ftdec / "images.npy").exists() or not (frozen / "images.npy").exists():
+        return
+    cfg = load_config(run / "config.yaml")
+    mods = list(cfg.data.modalities)
+    a = np.load(frozen / "images.npy", mmap_mode="r")[:n].astype(np.float32)
+    b = np.load(samples_ftdec / "images.npy", mmap_mode="r")[:n].astype(np.float32)
+    msk = np.load(samples_ftdec / "masks.npy", mmap_mode="r")[:n] if (samples_ftdec / "masks.npy").exists() else None
+    ncol = 2 * len(mods) + (1 if msk is not None else 0)
+    fig, axes = plt.subplots(n, ncol, figsize=(1.35 * ncol, 1.35 * n + 0.3), dpi=200)
+    for r in range(n):
+        for c, m in enumerate(mods):
+            axes[r, 2 * c].imshow(a[r, c], cmap="gray", vmin=0, vmax=1)
+            axes[r, 2 * c + 1].imshow(b[r, c], cmap="gray", vmin=0, vmax=1)
+            if r == 0:
+                axes[r, 2 * c].set_title(f"{m.upper()} frozen", color=INK, fontsize=6.5, pad=2)
+                axes[r, 2 * c + 1].set_title(f"{m.upper()} fine-tuned", color=INK, fontsize=6.5, pad=2)
+        if msk is not None:
+            axes[r, ncol - 1].imshow(colorize_mask(msk[r]).permute(1, 2, 0).numpy())
+            if r == 0:
+                axes[r, ncol - 1].set_title("mask", color=INK, fontsize=6.5, pad=2)
+        for c in range(ncol):
+            axes[r, c].set_xticks([])
+            axes[r, c].set_yticks([])
+            for sp in axes[r, c].spines.values():
+                sp.set_visible(False)
+    fig.subplots_adjust(wspace=0.04, hspace=0.04, left=0.01, right=0.99, top=0.92, bottom=0.01)
+    fig.savefig(out / f"{run.name}_{samples_ftdec.name}_frozen_vs_finetuned.png")
     plt.close(fig)
 
 
@@ -263,7 +297,10 @@ def main() -> None:
         loss_curves(run, out)
         checkpoint_curve(run, out)
         for samples in sorted(run.glob("samples_*")):
-            real_vs_synth(run, samples, out)
+            if samples.name.endswith("_ftdec"):  # same latents as the frozen-decoder set: show the two decodings instead
+                frozen_vs_finetuned(run, samples, out)
+            else:
+                real_vs_synth(run, samples, out)
     for dec in sorted(runs.glob("vae_dec_*")):
         decoder_figure(dec, out)
     segmentation_figure(Path(args.summary), out)

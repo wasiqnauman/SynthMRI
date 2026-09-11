@@ -38,14 +38,39 @@ img { max-width: 100%; display: block; margin: 6pt auto; page-break-inside: avoi
 """
 
 
-def embed_images(html: str, base: Path) -> str:
+GRID_FIGURES = ("real_vs_synth", "frozen_vs_finetuned", "vae_decoder", "reconstruction")  # image grids -> JPEG in the PDF
+
+
+def embed_images(html: str, base: Path, max_width: int = 1500) -> str:
+    """Inline every referenced PNG as a data URI, downscaled to ``max_width`` px (the figures are 200 dpi;
+    the printed page is ~180 mm wide, so 1500 px keeps them crisp and the PDF small)."""
+
     def repl(m: re.Match) -> str:
         src = m.group(1)
         f = base / src
         if not f.exists() or f.suffix.lower() != ".png":
             return m.group(0)
-        data = base64.b64encode(f.read_bytes()).decode()
-        return f'src="data:image/png;base64,{data}"'
+        raw = f.read_bytes()
+        try:
+            import io
+
+            from PIL import Image
+
+            im = Image.open(io.BytesIO(raw)).convert("RGB")
+            if im.width > max_width:
+                im = im.resize((max_width, round(im.height * max_width / im.width)), Image.LANCZOS)
+            buf = io.BytesIO()
+            if any(k in f.name for k in GRID_FIGURES):  # MRI grids: JPEG is 3-5x smaller at no visible cost
+                im.save(buf, format="JPEG", quality=88, optimize=True)
+                mime = "image/jpeg"
+            else:  # line plots / bar charts stay lossless
+                im.save(buf, format="PNG", optimize=True)
+                mime = "image/png"
+            raw = buf.getvalue()
+        except Exception:
+            mime = "image/png"
+        data = base64.b64encode(raw).decode()
+        return f'src="data:{mime};base64,{data}"'
 
     return re.sub(r'src="([^"]+)"', repl, html)
 

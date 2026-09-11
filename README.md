@@ -34,6 +34,11 @@ BraTS 2020 3-D volumes ──preprocess──▶ 2-D tumour slices (patient-leve
   (+0.027 mean Dice, all regions, 3/3 seeds) and is neutral with more. Used for pre-training instead,
   synthetic data helps at 128 px too: +0.021 at 10 % real and +0.014 at 25 % over a control given
   the same extra epochs on real data.
+* **Fine-tuning only the VAE decoder on the training slices** (encoder, latents and diffusion model
+  untouched) raises the 128 px ceiling from 26.4 to 27.8 dB (SSIM 0.833 → 0.883) and, decoding the
+  *same* latent samples again, cuts the per-modality FIDs by 35–75 % (T2 69.6 → 17.6) while the
+  composite 3-channel FID stays at 20.9. Whether that recovers the lost segmentation Dice is the
+  pending part of the study.
 
 | ![checkpoint curve](docs/figures/ldm128_maskcond_checkpoint_curve.png) | ![256 px segmentation](docs/figures/segmentation_dice_seg256.png) |
 |---|---|
@@ -42,7 +47,7 @@ BraTS 2020 3-D volumes ──preprocess──▶ 2-D tumour slices (patient-leve
 **Status.** Complete: all diffusion models, checkpoint curves, model selection, 128 px and 256 px
 segmentation studies, secondary analyses and the compute-matched pre-training control. Running (see
 [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) for the pre-declared protocol): the VAE-decoder fine-tune
-study (decoder trained, ceiling 26.4 → 27.8 dB; re-decoded samples and segmentation pending). A PDF of the results with all figures is
+study (decoder trained and samples re-decoded and scored; the repeated segmentation study is pending). A PDF of the results with all figures is
 [docs/SynthMRI_results.pdf](docs/SynthMRI_results.pdf) (`python scripts/make_report.py`).
 
 ## Setup
