@@ -110,6 +110,7 @@ validation loss, EMA weights; the default for sampling, see `--checkpoint`) and 
 | file | contents |
 |---|---|
 | [docs/RESULTS.md](docs/RESULTS.md) | all results with interpretation; every number traceable to a run directory |
+| [paper/main.pdf](paper/main.pdf) | manuscript draft (LaTeX source in `paper/`; every number copied from RESULTS.md; author block and affiliations still placeholders) |
 | [docs/results_tables.md](docs/results_tables.md) | auto-generated tables (`scripts/collect_results.py`), also `results/summary.json` |
 | [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) | protocol, model-selection rule, and the pre-declared follow-up studies with their reading rules |
 | [docs/REPRODUCE.md](docs/REPRODUCE.md) | commands, queue scripts and timings to reproduce everything on one GPU |

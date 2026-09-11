@@ -1,5 +1,19 @@
 # Work log
 
+## 2026-09-11 -- Manuscript draft (paper/)
+
+First full paper draft: `paper/main.tex` + `paper/refs.bib` (LaTeX `article`, 11 pages, builds with
+`latexmk -pdf`), `paper/main.pdf` committed. Abstract, introduction, related work, data and
+pre-declared protocol, methods, results (memorisation curves, generation quality, 128 px
+segmentation, secondary analyses with the compute-matched control, 256 px, decoder fine-tune with
+reading b), discussion, limitations, conclusion, reproducibility statement; 6 figures and 6 tables
+taken from `docs/figures/` and `docs/RESULTS.md`. Author block, affiliations and contact are
+red placeholders (two authors: the project lead first, Hamza Shah second). Build artefacts are
+git-ignored.
+
+Files: paper/main.tex, paper/refs.bib, paper/main.pdf, .gitignore, README.md, docs/REPRODUCE.md
+Follow-ups: fill in the author block; pick the venue and port to its template; add a related-work pass by the first author
+
 ## 2026-09-11 -- VAE decoder fine-tune study complete (48 U-Nets); reading (b) applied
 
 `runs/seg_ftdec` secondary analyses finished 01:29 (queue7 total 19:20–01:30, 6.2 h). With the

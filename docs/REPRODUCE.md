@@ -81,6 +81,9 @@ scripts `scripts/queue_2026-09-10.sh` (secondary analyses), `queue_2026-09-10b.s
 each waits for the previous queue's process to exit and then calls the runner with the environment
 variables shown in the table.
 
+The manuscript draft in `paper/` builds with `cd paper && latexmk -pdf main.tex` (TeX Live with
+`natbib`, `booktabs`, `hyperref`); its figures are read from `docs/figures/`.
+
 ## 5. The same thing step by step
 
 ```bash

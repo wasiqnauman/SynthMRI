@@ -1,0 +1,10 @@
+# LaTeX build artefacts (paper/main.pdf is kept)
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
+paper/build.log
