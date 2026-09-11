@@ -6,10 +6,11 @@ which `scripts/collect_results.py` regenerates from the run directories under `r
 `best/` weights (lowest validation diffusion loss, EMA) and 5,000 DDIM-50 samples unless stated;
 segmentation Dice is per-patient on the 74 held-out test patients, mean ± std over 3 seeds.
 
-Status (2026-09-10 19:25): the diffusion models, the checkpoint curves, the model selection, the
+Status (2026-09-10 20:30): the diffusion models, the checkpoint curves, the model selection, the
 128 px segmentation study with its secondary analyses and the pre-training control, and the 256 px
-segmentation study are complete. One pre-declared follow-up is running and marked *pending*: the
-VAE decoder fine-tune study (section 7, ≈ 10 h).
+segmentation study are complete. The pre-declared VAE decoder fine-tune study (section 7) is
+running: the decoder is trained and its ceiling measured (7.1); the re-decoded sample scores (7.2)
+and the repeated segmentation study (7.3, ≈ 8 h) are marked *pending*.
 
 ## Headline findings
 
@@ -224,13 +225,41 @@ finding that the decoder's loss of detail, not the diffusion model, was limiting
 Note that the 256 px real-only segmenters are themselves stronger (0.709 / 0.764 / 0.804 vs
 0.630 / 0.711 / 0.778), so the two resolutions are compared only within themselves.
 
-## 7. VAE decoder fine-tuning (*pending*)
+## 7. VAE decoder fine-tuning (running: 7.1 done, 7.2–7.3 *pending*)
 
-Declared after section 5's VAE control: only `decoder` + `post_quant_conv` of the VAE are fine-tuned
-on the 128 px training slices (L1 + LPIPS, validation-selected epoch), the same latents are decoded
-again with the new decoder, and the primary + secondary segmentation study is repeated with that
-pool (`runs/vae_dec_brats128/`, `runs/seg_ftdec/`). Pre-declared readings are in
-[EXPERIMENTS.md](EXPERIMENTS.md); queued after section 8 (≈ 10 h).
+Declared after section 5's VAE control (protocol and pre-declared readings in
+[EXPERIMENTS.md](EXPERIMENTS.md)). Only `decoder` + `post_quant_conv` of `sd-vae-ft-mse` (49.5 M
+parameters) were trained on the 15,895 training slices with L1 + 0.5·LPIPS-VGG per channel (AdamW
+2e-5, batch 16, horizontal flips, 8 epochs, 57 min on the A6000); the epoch with the lowest
+validation loss is kept (epoch 8, 0.096 → 0.067, still falling slowly). The encoder is untouched,
+so every cached latent and LDM-128-mask-reg itself stay valid: the same latents are simply decoded
+again (`runs/vae_dec_brats128/`, `scripts/finetune_vae_decoder.py`).
+
+### 7.1 Reconstruction ceiling on the 4,623 test slices (pre-declared reading a)
+
+| decoder | PSNR ↑ | SSIM ↑ | LPIPS-Alex ↓ | FLAIR / T1ce / T2 PSNR |
+|---|---|---|---|---|
+| frozen `sd-vae-ft-mse` | 26.37 dB | 0.833 | 0.041 | 27.0 / 27.2 / 25.4 |
+| fine-tuned decoder | **27.79 dB** | **0.883** | **0.032** | 28.6 / 28.3 / 27.0 |
+
+All three metrics improve, so reading (a) is passed and the study continues. The gain is about
+half of the gap to the 256 px ceiling in PSNR (29.0 dB) and exceeds it in SSIM (0.877); T2, the
+worst channel of the frozen decoder, gains the most (+1.6 dB, SSIM 0.817 → 0.880). The figure
+`figures/vae_decoder_brats128.png` shows three test slices with enhancing tumour through both
+decoders: the blotchy texture the frozen decoder puts into T2 disappears and the enhancing rims in
+T1ce come out sharper.
+
+![frozen vs fine-tuned decoder](figures/vae_decoder_brats128.png)
+
+### 7.2 Re-decoded samples (*pending*)
+
+The 20,000 training-mask, 5,000 g = 1 and 5,000 validation-mask sample sets of LDM-128-mask-reg
+are decoded again with the fine-tuned decoder (`samples_*_ftdec`) and scored as in section 3.
+
+### 7.3 Segmentation with the re-decoded pool (*pending*, pre-declared reading b)
+
+Primary and secondary protocols repeated unchanged into `runs/seg_ftdec/` (48 U-Nets), with the
+VAE-reconstructed-real control also using the fine-tuned decoder.
 
 ## 8. Compute-matched control for synthetic pre-training
 

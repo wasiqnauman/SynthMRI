@@ -42,7 +42,7 @@ BraTS 2020 3-D volumes ──preprocess──▶ 2-D tumour slices (patient-leve
 **Status.** Complete: all diffusion models, checkpoint curves, model selection, 128 px and 256 px
 segmentation studies, secondary analyses and the compute-matched pre-training control. Running (see
 [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) for the pre-declared protocol): the VAE-decoder fine-tune
-study. A PDF of the results with all figures is
+study (decoder trained, ceiling 26.4 → 27.8 dB; re-decoded samples and segmentation pending). A PDF of the results with all figures is
 [docs/SynthMRI_results.pdf](docs/SynthMRI_results.pdf) (`python scripts/make_report.py`).
 
 ## Setup

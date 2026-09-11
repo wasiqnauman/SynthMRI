@@ -1590,6 +1590,58 @@
         },
         "frac_fake_closer_than_test_p5": 0.0238
       }
+    },
+    "vae_finetune/vae_dec_brats128": {
+      "before": {
+        "psnr": {
+          "mean": 26.367382576422802,
+          "std": 1.922104230500529
+        },
+        "ssim": {
+          "mean": 0.8325008084034987,
+          "std": 0.04631951378959172
+        },
+        "lpips": {
+          "mean": 0.04076260737013116,
+          "std": 0.011333038798804316
+        }
+      },
+      "after": {
+        "psnr": {
+          "mean": 27.787266416671393,
+          "std": 1.8458574010504696
+        },
+        "ssim": {
+          "mean": 0.8833662384571824,
+          "std": 0.030104604122458682
+        },
+        "lpips": {
+          "mean": 0.03245646182448478,
+          "std": 0.009590806816442508
+        }
+      },
+      "finetune": {
+        "best_epoch": 8,
+        "best_val_loss": 0.06724852499875165,
+        "epochs_run": 8,
+        "steps": 7944,
+        "config": {
+          "epochs": 8,
+          "batch_size": 16,
+          "lr": 2e-05,
+          "weight_decay": 0.0,
+          "lpips_weight": 0.5,
+          "lpips_net": "vgg",
+          "warmup_steps": 100,
+          "grad_clip": 1.0,
+          "seed": 0,
+          "num_workers": 4,
+          "max_steps": null,
+          "max_val_items": null
+        },
+        "n_trainable_params": 49490199,
+        "minutes": 56.9337974468867
+      }
     }
   },
   "checkpoints": {

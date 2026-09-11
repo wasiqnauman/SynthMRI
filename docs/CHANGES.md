@@ -1,5 +1,19 @@
 # Work log
 
+## 2026-09-10 -- VAE decoder fine-tuned; ceiling gate passed; decoder figure
+
+`scripts/finetune_vae_decoder.py` ran as the first stage of the decoder study (queue7, 19:20–20:18):
+the test-slice reconstruction ceiling of `sd-vae-ft-mse` at 128 px rises from PSNR 26.37 / SSIM
+0.833 / LPIPS 0.041 to 27.79 / 0.883 / 0.032 after training only the decoder for 8 epochs, so the
+pre-declared "ceiling must improve" gate is passed and the queue went on to re-decode the sample
+sets (then 48 segmentation U-Nets into `runs/seg_ftdec`). `scripts/make_figures.py` gains
+`vae_decoder_<data>.png` (real test slices through the frozen vs the fine-tuned decoder, CPU) and
+RESULTS.md section 7.1 reports the ceiling; 7.2 / 7.3 stay *pending*. `decoder.pt` (189 MB) lives
+under the git-ignored `runs/`.
+
+Files: scripts/make_figures.py, docs/figures/vae_decoder_brats128.png, docs/RESULTS.md, docs/results_tables.md, results/summary.json
+Follow-ups: sections 7.2 (re-decoded sample scores, ~21:15) and 7.3 (segmentation, ~2026-09-11 05:00)
+
 ## 2026-09-10 -- Pre-training control complete (3 seeds)
 
 `seg3` finished 19:18 (9 U-Nets). A segmenter given the same 20 extra epochs on real data reaches

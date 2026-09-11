@@ -8,6 +8,7 @@
 * <run>_checkpoint_curve.png          loss / FID / memorisation per saved checkpoint (scripts/checkpoint_curve.py)
 * segmentation_dice[_<dir>].png       downstream Dice by real-data fraction, real vs real+synthetic (one per runs/seg* study)
 * segmentation_dice[_<dir>]_secondary.png  secondary analyses: 1:1 synthetic, synthetic pre-training, VAE-reconstructed real
+* vae_decoder_<data>.png              test slices through the frozen vs the fine-tuned VAE decoder (runs/vae_dec_*/decoder.pt)
 Missing inputs are skipped, so the script can be run at any point of the experiment set.
 """
 
@@ -23,6 +24,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
+import torch  # noqa: E402
 
 from synthmri.config import load_config  # noqa: E402
 from synthmri.data.dataset import SliceDataset  # noqa: E402
@@ -154,6 +156,49 @@ def checkpoint_curve(run: Path, out: Path) -> None:
     plt.close(fig)
 
 
+def decoder_figure(dec_dir: Path, out: Path, n: int = 3) -> None:
+    """Real test slices vs their reconstruction through the frozen and the fine-tuned VAE decoder (CPU)."""
+    if not (dec_dir / "decoder.pt").exists() or not (dec_dir / "results.json").exists():
+        return
+    from synthmri.models.vae import load_vae
+
+    res = json.loads((dec_dir / "results.json").read_text())
+    cfg_path = Path(res.get("config", ""))
+    if not cfg_path.exists():
+        return
+    cfg = load_config(cfg_path)
+    mods = list(res.get("modalities") or cfg.data.modalities)
+    ds = SliceDataset(cfg.data.processed_dir, "test", tuple(mods), hflip=False)
+    rng = np.random.RandomState(0)
+    idx = [int(i) for i in rng.permutation(len(ds)) if ds.masks[i].max() >= 3][:n]  # slices with enhancing tumour
+    x = torch.stack([ds[i]["image"] for i in idx])
+    dev = torch.device("cpu")
+    recon = []
+    for weights in (None, dec_dir / "decoder.pt"):
+        vae = load_vae(res.get("pretrained", cfg.model.vae.pretrained), device=dev, scaling_factor=cfg.model.vae.scaling_factor, decoder_weights=weights)
+        with torch.no_grad():
+            recon.append(vae.reconstruct(x, sample=False).clamp(-1, 1))
+    panels = [x] + recon
+    names = ["real", "frozen decoder", "fine-tuned decoder"]
+    ncol = 3 * n
+    fig, axes = plt.subplots(len(mods), ncol, figsize=(1.25 * ncol, 1.25 * len(mods) + 0.35), dpi=200)
+    for r, m in enumerate(mods):
+        for j in range(n):
+            for k, pan in enumerate(panels):
+                c = 3 * j + k
+                axes[r, c].imshow(pan[j, r].numpy() / 2 + 0.5, cmap="gray", vmin=0, vmax=1)
+                axes[r, c].set_xticks([])
+                axes[r, c].set_yticks([])
+                for sp in axes[r, c].spines.values():
+                    sp.set_visible(False)
+                if r == 0:
+                    axes[r, c].set_title(names[k], color=INK, fontsize=6.5, pad=2)
+        axes[r, 0].set_ylabel(m.upper(), color=INK2, fontsize=7)
+    fig.subplots_adjust(wspace=0.04, hspace=0.04, left=0.04, right=0.995, top=0.93, bottom=0.01)
+    fig.savefig(out / f"vae_decoder_{res.get('dataset', dec_dir.name)}.png")
+    plt.close(fig)
+
+
 def _seg_bars(seg: dict, conditions: list[tuple[str, str]], filename: Path, synthetic_only_line: bool) -> None:
     """Grouped bars: one group per real-data fraction, one bar per (label, key suffix) condition."""
     fracs = [k for k in ("10% real", "25% real", "100% real") if k in seg]
@@ -219,6 +264,8 @@ def main() -> None:
         checkpoint_curve(run, out)
         for samples in sorted(run.glob("samples_*")):
             real_vs_synth(run, samples, out)
+    for dec in sorted(runs.glob("vae_dec_*")):
+        decoder_figure(dec, out)
     segmentation_figure(Path(args.summary), out)
     print(f"figures written to {out}")
 

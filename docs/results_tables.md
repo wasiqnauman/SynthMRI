@@ -31,6 +31,12 @@
 | brats256 (ldm256_maskcond_reg) | frozen | t2 | 27.95 ± 2.06 | 0.863 ± 0.035 | 0.077 |
 | brats256 (ldm256_maskcond_reg) | frozen | rgb | 28.98 ± 1.80 | 0.877 ± 0.032 | 0.036 |
 
+## VAE decoder fine-tuning (test-slice reconstruction ceiling before / after; encoder unchanged)
+
+| run | data | epochs (best) | trainable params | PSNR before → after | SSIM before → after | LPIPS before → after |
+|---|---|---|---|---|---|---|
+| vae_dec_brats128 | brats128 | 8 (8) | 49.5M | 26.37 → 27.79 | 0.833 → 0.883 | 0.041 → 0.032 |
+
 ## Checkpoint curve: best-validation-loss vs last checkpoint (2,000 samples each; FID/KID vs real validation slices; memorised = fraction of samples closer to a training slice than 95 % of real held-out slices)
 
 | run | best epoch | val loss | FID val ↓ | KID val ×10³ ↓ | memorised ↓ | last epoch | FID val | memorised |
