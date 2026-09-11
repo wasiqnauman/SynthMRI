@@ -37,18 +37,20 @@ BraTS 2020 3-D volumes ──preprocess──▶ 2-D tumour slices (patient-leve
 * **Fine-tuning only the VAE decoder on the training slices** (encoder, latents and diffusion model
   untouched) raises the 128 px ceiling from 26.4 to 27.8 dB (SSIM 0.833 → 0.883) and, decoding the
   *same* latent samples again, cuts the per-modality FIDs by 35–75 % (T2 69.6 → 17.6) while the
-  composite 3-channel FID stays at 20.9. It recovers only about a third of the segmentation loss
-  (10 % real: −0.031 → −0.020; 100 %: −0.021 → −0.012; ET still −0.06 to −0.08), so the blur was
-  part of the problem, not most of it. The secondary analyses with the new decoder are pending.
+  composite 3-channel FID stays at 20.9. It recovers only about a third of the Dice the autoencoder
+  costs (real slices passed through it: −0.06 / −0.07 → −0.04 / −0.06; mixing at 10 % real:
+  −0.031 → −0.020); the rest is detail the encoder's 16 × 16 × 4 latent discards, so the bottleneck,
+  not the diffusion model, limits the 128 px result. The pre-training gain is unchanged
+  (+0.018 / +0.015 vs the control).
 
 | ![checkpoint curve](docs/figures/ldm128_maskcond_checkpoint_curve.png) | ![256 px segmentation](docs/figures/segmentation_dice_seg256.png) |
 |---|---|
 | baseline: validation loss, FID and copied fraction per epoch | 256 px: Dice with and without synthetic slices |
 
 **Status.** Complete: all diffusion models, checkpoint curves, model selection, 128 px and 256 px
-segmentation studies, secondary analyses and the compute-matched pre-training control. Running (see
-[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) for the pre-declared protocol): the VAE-decoder fine-tune
-study (decoder trained, samples re-decoded and scored, primary segmentation protocol repeated; its secondary analyses are pending). A PDF of the results with all figures is
+segmentation studies, secondary analyses, the compute-matched pre-training control and the
+VAE-decoder fine-tune study (pre-declared protocols in [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md)).
+Nothing is running. A PDF of the results with all figures is
 [docs/SynthMRI_results.pdf](docs/SynthMRI_results.pdf) (`python scripts/make_report.py`).
 
 ## Setup

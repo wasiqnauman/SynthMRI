@@ -6,12 +6,10 @@ which `scripts/collect_results.py` regenerates from the run directories under `r
 `best/` weights (lowest validation diffusion loss, EMA) and 5,000 DDIM-50 samples unless stated;
 segmentation Dice is per-patient on the 74 held-out test patients, mean ± std over 3 seeds.
 
-Status (2026-09-10 23:00): the diffusion models, the checkpoint curves, the model selection, the
-128 px segmentation study with its secondary analyses and the pre-training control, and the 256 px
-segmentation study are complete. The pre-declared VAE decoder fine-tune study (section 7) is
-running: the decoder is trained and its ceiling measured (7.1), the re-decoded samples are scored
-(7.2) and the primary segmentation protocol is repeated (7.3); its secondary analyses (27 U-Nets,
-≈ 3 h) are marked *pending*.
+Status (2026-09-11 01:35): complete. The diffusion models, the checkpoint curves, the model
+selection, the 128 px segmentation study with its secondary analyses and the pre-training control,
+the 256 px segmentation study and the pre-declared VAE decoder fine-tune study (section 7) have all
+finished; nothing is running.
 
 ## Headline findings
 
@@ -32,10 +30,14 @@ running: the decoder is trained and its ceiling measured (7.1), the re-decoded s
    (0.801 → 0.809) but lowers tumour-core and enhancing-tumour Dice at every data fraction (ET at
    10 %: 0.509 → 0.430; mean Dice at 100 %: 0.778 → 0.757). A segmenter trained on synthetic data
    alone reaches 0.660 mean Dice, about the level of 10 % real data.
-5. **The loss is the frozen VAE's, not the diffusion model's.** Real slices merely passed through the
-   frozen VAE (no generator) cost more Dice than the synthetic slices do (−0.057 to −0.072 mean,
-   ET −0.11 to −0.14), and halving the synthetic ratio barely helps. The natural-image decoder
-   removes enhancing-tumour detail; every synthetic image inherits that.
+5. **The loss is the autoencoder's, not the diffusion model's, and mostly the encoder's.** Real
+   slices merely passed through the frozen VAE (no generator) cost more Dice than the synthetic
+   slices do (−0.057 to −0.072 mean, ET −0.11 to −0.14), and halving the synthetic ratio barely
+   helps. Fine-tuning the decoder on the training slices (section 7) raises the reconstruction
+   ceiling from 26.4 to 27.8 dB and cuts the per-modality FIDs of the *same* latent samples by
+   35–75 % (T2 69.6 → 17.6), but recovers only about a third of the Dice loss (VAE-reconstructed
+   real: −0.044 to −0.055; mixing: −0.020 / −0.033 / −0.012 at 10 / 25 / 100 % real). What the
+   16 × 16 × 4 latent discards, no decoder brings back.
 6. **Used as pre-training instead of as extra training data, the synthetic pairs help when real data
    is scarce, even against a compute-matched control**: +0.021 mean Dice at 10 % real and +0.014 at
    25 % over a segmenter given the same extra epochs on real data (raw gains over real only: +0.044
@@ -189,7 +191,8 @@ Three answers to the questions posed in the declaration:
   `decode(encode(x))` of the frozen `sd-vae-ft-mse`, with no generator involved, cost −0.057 /
   −0.072 / −0.072 mean Dice, again concentrated on ET (−0.11 to −0.14). Every synthetic image carries
   exactly this decoder, so the enhancing-tumour detail the segmenter needs is removed before the
-  diffusion model is even involved. This motivates the decoder fine-tune of section 7.
+  diffusion model is even involved. This motivated the decoder fine-tune of section 7, which
+  recovers about a third of it.
 * **Pre-training on synthetic pairs, then fine-tuning on real, helps in the low-data regime.**
   +0.044 mean Dice at 10 % real (all three regions, ET 0.509 → 0.564, 3/3 seeds), +0.015 at 25 %,
   nothing at 100 %. Fine-tuning on real slices overrides the blurred appearance that mixing bakes
@@ -226,7 +229,7 @@ finding that the decoder's loss of detail, not the diffusion model, was limiting
 Note that the 256 px real-only segmenters are themselves stronger (0.709 / 0.764 / 0.804 vs
 0.630 / 0.711 / 0.778), so the two resolutions are compared only within themselves.
 
-## 7. VAE decoder fine-tuning (running: 7.1–7.2 and the primary part of 7.3 done, secondary *pending*)
+## 7. VAE decoder fine-tuning
 
 Declared after section 5's VAE control (protocol and pre-declared readings in
 [EXPERIMENTS.md](EXPERIMENTS.md)). Only `decoder` + `post_quant_conv` of `sd-vae-ft-mse` (49.5 M
@@ -308,10 +311,44 @@ seed-matched pairs and enhancing tumour still loses 0.06–0.08 Dice; tumour cor
 slices alone reaches 0.672 mean Dice (0.660 with the frozen decoding), still the level of 10 %
 real data. So the decoder's blur was part of the problem but not most of it. The encoder is
 unchanged, so whether the remaining loss is the latent bottleneck's (detail the 16 × 16 × 4 latent
-never held, which no decoder can restore) or the diffusion model's is what the secondary study's
-VAE-reconstructed-real control with the fine-tuned decoder decides (*pending*, 27 U-Nets, ≈ 01:45).
+never held, which no decoder can restore) or the diffusion model's is what the VAE-reconstructed-real
+control below decides.
 
 ![128 px segmentation with the fine-tuned decoder](figures/segmentation_dice_seg_ftdec.png)
+
+**Secondary analyses with the fine-tuned decoder** (same protocol as section 5; the
+VAE-reconstructed-real control now uses the fine-tuned decoder, 27 U-Nets, 2.6 h):
+
+| training data (fine-tuned decoder) | WT | TC | ET | mean | Δ vs real only | same Δ with the frozen decoder (section 5) |
+|---|---|---|---|---|---|---|
+| 10 % real | 0.796 ± 0.009 | 0.579 ± 0.026 | 0.510 ± 0.025 | 0.628 ± 0.017 | | |
+| 10 % real + synthetic 1:1 | 0.814 ± 0.001 | 0.589 ± 0.016 | 0.461 ± 0.017 | 0.621 ± 0.011 | −0.007 | −0.020 |
+| 10 % real, VAE-reconstructed | 0.783 ± 0.013 | 0.541 ± 0.035 | 0.430 ± 0.032 | 0.585 ± 0.025 | **−0.044** | −0.057 |
+| 10 % real, synthetic pre-training | 0.827 ± 0.005 | 0.625 ± 0.006 | 0.560 ± 0.010 | 0.671 ± 0.006 | **+0.042** | +0.044 |
+| 25 % real | 0.848 ± 0.002 | 0.683 ± 0.006 | 0.612 ± 0.013 | 0.714 ± 0.005 | | |
+| 25 % real + synthetic 1:1 | 0.847 ± 0.003 | 0.665 ± 0.012 | 0.556 ± 0.014 | 0.689 ± 0.009 | −0.025 | −0.024 |
+| 25 % real, VAE-reconstructed | 0.831 ± 0.005 | 0.643 ± 0.009 | 0.505 ± 0.008 | 0.660 ± 0.003 | **−0.055** | −0.072 |
+| 25 % real, synthetic pre-training | 0.858 ± 0.003 | 0.700 ± 0.020 | 0.621 ± 0.006 | 0.726 ± 0.009 | **+0.012** | +0.015 |
+| 100 % real | 0.885 ± 0.002 | 0.770 ± 0.001 | 0.674 ± 0.006 | 0.776 ± 0.002 | | |
+| 100 % real + synthetic 1:1 | 0.882 ± 0.002 | 0.757 ± 0.011 | 0.655 ± 0.003 | 0.765 ± 0.003 | −0.012 | −0.018 |
+| 100 % real, VAE-reconstructed | 0.868 ± 0.002 | 0.740 ± 0.005 | 0.584 ± 0.011 | 0.731 ± 0.006 | **−0.045** | −0.072 |
+| 100 % real, synthetic pre-training | 0.888 ± 0.001 | 0.781 ± 0.008 | 0.672 ± 0.002 | 0.780 ± 0.003 | +0.004 | +0.001 |
+
+![128 px secondary analyses with the fine-tuned decoder](figures/segmentation_dice_seg_ftdec_secondary.png)
+
+**Reading (b).** The VAE-reconstructed-real control moves towards real only at every fraction
+(−0.057 → −0.044, −0.072 → −0.055, −0.072 → −0.045 mean; ET −0.11 / −0.14 / −0.13 → −0.08 / −0.11 /
+−0.09) and real + synthetic moves the same way (−0.031 → −0.020, −0.036 → −0.033, −0.021 →
+−0.012), so the pre-declared condition for "the loss is the decoder's" is met, but only in part. A
+decoder trained on these very slices still loses 0.044–0.055 mean Dice (ET 0.08–0.11) when real
+slices are merely passed through the autoencoder, which remains more than mixing synthetic data
+costs. The loss is therefore the autoencoder's and not the diffusion model's, as section 5
+concluded, but its larger part sits in the encoder's 16 × 16 × 4 latent bottleneck, which discards
+enhancing-tumour detail that no decoder can restore; the decoder accounts for about a third. Two
+results are unchanged by the decoder: synthetic pre-training keeps its low-data gain (+0.042 /
++0.012 / +0.004 raw; +0.018 / +0.015 / −0.001 against the compute-matched control of section 8,
+3/3 seeds positive at 10 % and 25 %), and the 1:1 ratio costs −0.025 / −0.012 at 25 % / 100 % and
+nothing measurable at 10 % (−0.007, within the seed spread).
 
 ## 8. Compute-matched control for synthetic pre-training
 
@@ -337,7 +374,10 @@ both conditions. At 25 % the control gains nothing and synthetic pre-training ke
 * Inception features (natural images) for FID/KID; the real val-vs-test floor is reported to
   calibrate them, but a radiology-specific extractor would be more sensitive to clinically
   relevant detail.
-* The VAE is frozen (`sd-vae-ft-mse`, trained on natural images); its ceiling bounds every model.
+* The VAE encoder is the frozen `sd-vae-ft-mse` (natural images; 16 × 16 × 4 latents at 128 px).
+  Fine-tuning its decoder (section 7) recovers only about a third of the Dice the autoencoder
+  costs; the rest is detail the encoder discards, so a medical-image autoencoder, or fine-tuning
+  the encoder with the diffusion models retrained, is the natural next step.
 * One dataset (BraTS 2020, 369 patients, one split); the segmentation conclusions have 3 seeds
   but no external test cohort.
 * Compute per model: 1.5 h (128 px) / 2.8 h (256 px) on one RTX A6000; 200 epochs each.

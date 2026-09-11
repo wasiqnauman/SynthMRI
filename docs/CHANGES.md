@@ -1,5 +1,19 @@
 # Work log
 
+## 2026-09-11 -- VAE decoder fine-tune study complete (48 U-Nets); reading (b) applied
+
+`runs/seg_ftdec` secondary analyses finished 01:29 (queue7 total 19:20–01:30, 6.2 h). With the
+fine-tuned decoder the VAE-reconstructed-real control moves towards real only (−0.057 / −0.072 /
+−0.072 → −0.044 / −0.055 / −0.045) and mixing moves the same way, so the pre-declared reading (b)
+attributes the loss to the autoencoder, not the diffusion model, with the decoder responsible for
+about a third and the encoder's latent bottleneck for the rest. Synthetic pre-training keeps
++0.018 / +0.015 vs the compute-matched control. RESULTS.md section 7 finished, finding 5 and the
+Limitations rewritten, README, REPRODUCE timings, EXPERIMENTS next steps and the PDF updated.
+Nothing is running.
+
+Files: docs/RESULTS.md, README.md, docs/REPRODUCE.md, docs/EXPERIMENTS.md, docs/results_tables.md, results/summary.json, docs/figures/segmentation_dice_seg_ftdec_secondary.png, docs/SynthMRI_results.pdf
+Follow-ups: none queued; next experiments would be a medical-image autoencoder / encoder fine-tune, a second dataset, and 3-D or 2.5-D generation (EXPERIMENTS.md)
+
 ## 2026-09-10 -- Decoder study: primary segmentation protocol with the re-decoded pool (3 seeds)
 
 `runs/seg_ftdec` primary protocol finished 22:51 (21 U-Nets, 2.2 h). With the fine-tuned decoder,

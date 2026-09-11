@@ -176,6 +176,7 @@ pre-training control of `seg3` is decoder-independent and is not repeated.
 
 * A radiology-specific feature extractor (e.g. RadImageNet) for FID, alongside Inception.
 * 3-D or 2.5-D generation; the present models are per-slice and ignore inter-slice consistency.
-* Fine-tuning the whole VAE (encoder included) or training a medical-image VAE, once the decoder
-  fine-tune above has been evaluated.
+* A medical-image autoencoder, or fine-tuning the encoder as well (which invalidates the cached
+  latents and needs the diffusion models retrained): the decoder fine-tune above recovered only
+  about a third of the autoencoder's Dice loss (RESULTS.md, section 7).
 * External validation of the segmenter on BraTS 2021 patients not in BraTS 2020.
