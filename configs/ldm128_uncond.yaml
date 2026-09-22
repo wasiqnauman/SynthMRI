@@ -1,0 +1,10 @@
+# Unconditional LDM at 128 px (16x16 latent). Closest to the original notebook's setting.
+_base_: base.yaml
+name: ldm128_uncond
+data:
+  image_size: 128
+  processed_dir: data/processed/brats128
+model:
+  conditioning: none
+train:
+  output_dir: runs/ldm128_uncond

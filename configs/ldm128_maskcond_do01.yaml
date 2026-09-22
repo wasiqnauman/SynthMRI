@@ -1,0 +1,9 @@
+# Regularisation ablation: LDM-128-mask with dropout 0.1 in every U-Net residual block, otherwise
+# identical to ldm128_maskcond.yaml (motivated by the memorisation curve of that run).
+_base_: ldm128_maskcond.yaml
+name: ldm128_maskcond_do01
+model:
+  unet:
+    dropout: 0.1
+train:
+  output_dir: runs/ldm128_maskcond_do01
